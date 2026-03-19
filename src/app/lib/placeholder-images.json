@@ -1,0 +1,35 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "campus-hero",
+      "description": "Aerial view of a modern university campus",
+      "imageUrl": "https://picsum.photos/seed/dash1/1200/400",
+      "imageHint": "university campus"
+    },
+    {
+      "id": "student-avatar-1",
+      "description": "Diverse student smiling",
+      "imageUrl": "https://picsum.photos/seed/dash2/200/200",
+      "imageHint": "student portrait"
+    },
+    {
+      "id": "student-avatar-2",
+      "description": "Student in library",
+      "imageUrl": "https://picsum.photos/seed/dash3/200/200",
+      "imageHint": "student studying"
+    },
+    {
+      "id": "campus-event-1",
+      "description": "Students at a career fair",
+      "imageUrl": "https://picsum.photos/seed/dash4/800/400",
+      "imageHint": "career fair"
+    },
+    {
+      "id": "marketplace-item-1",
+      "description": "Used textbook on a desk",
+      "imageUrl": "https://picsum.photos/seed/dash5/400/300",
+      "imageHint": "textbook"
+    }
+  ]
+}
