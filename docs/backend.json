@@ -1,0 +1,1975 @@
+{
+  "entities": {
+    "University": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "University",
+      "type": "object",
+      "description": "Represents a university institution registered with Dash, managing global configurations and allowing multi-tenancy.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the University entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the university."
+        },
+        "domainAllowlist": {
+          "type": "array",
+          "description": "A list of allowed institutional email domains for user registration (e.g., 'univ.cm').",
+          "items": {
+            "type": "string"
+          }
+        },
+        "faculties": {
+          "type": "array",
+          "description": "A list of faculties available at the university for student affiliation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "departments": {
+          "type": "array",
+          "description": "A list of departments available at the university for student affiliation.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "campusMapImageUrl": {
+          "type": "string",
+          "description": "Cloudinary URL for the static campus map image, used for event location pinning.",
+          "format": "uri"
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency code used for marketplace listings (e.g., 'XAF')."
+        },
+        "welcomeMessage": {
+          "type": "string",
+          "description": "A customizable welcome message displayed to new users upon completing onboarding."
+        },
+        "aiAssistEnabled": {
+          "type": "boolean",
+          "description": "A flag indicating whether AI assistance features are enabled for administrators in this university."
+        },
+        "enableMarketplace": {
+          "type": "boolean",
+          "description": "A flag to enable or disable the Campus Marketplace feature for this university."
+        },
+        "enableTimetable": {
+          "type": "boolean",
+          "description": "A flag to enable or disable the Course Timetable Viewer feature for this university."
+        },
+        "enableLostFound": {
+          "type": "boolean",
+          "description": "A flag to enable or disable the Lost & Found Board feature for this university."
+        },
+        "maintenanceMode": {
+          "type": "boolean",
+          "description": "A flag to put the university's platform into maintenance mode, restricting user access."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the university entity was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "domainAllowlist",
+        "faculties",
+        "departments",
+        "currency",
+        "aiAssistEnabled",
+        "enableMarketplace",
+        "enableTimetable",
+        "enableLostFound",
+        "maintenanceMode",
+        "createdAt"
+      ]
+    },
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user profile on the Dash platform, storing personal information, roles, and preferences.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N UserProfile)"
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's institutional email address.",
+          "format": "email"
+        },
+        "username": {
+          "type": "string",
+          "description": "A unique, alphanumeric identifier for the user, immutable after creation (3-30 chars, alphanumeric and underscores)."
+        },
+        "fullName": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "Cloudinary URL for the user's profile picture.",
+          "format": "uri"
+        },
+        "coverPhotoUrl": {
+          "type": "string",
+          "description": "Cloudinary URL for the user's cover photo.",
+          "format": "uri"
+        },
+        "bio": {
+          "type": "string",
+          "description": "The user's short biography (max 160 characters)."
+        },
+        "faculty": {
+          "type": "string",
+          "description": "The user's academic faculty."
+        },
+        "department": {
+          "type": "string",
+          "description": "The user's academic department."
+        },
+        "yearOfStudy": {
+          "type": "number",
+          "description": "The user's current year of study (1-7)."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Optional student identification number."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role on the platform: 'student', 'admin', 'superadmin', 'wellbeing_admin'."
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "True if the user's email address has been verified."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "True if the user's account is active and not soft-deleted."
+        },
+        "isSuspended": {
+          "type": "boolean",
+          "description": "True if the user's account is currently suspended."
+        },
+        "suspensionReason": {
+          "type": "string",
+          "description": "The reason provided for account suspension."
+        },
+        "suspensionTime": {
+          "type": "string",
+          "description": "Timestamp when the account was suspended.",
+          "format": "date-time"
+        },
+        "suspendedByUserId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N UserProfile - Admin suspended student)"
+        },
+        "fcmToken": {
+          "type": "string",
+          "description": "The Firebase Cloud Messaging token for the user's current device, used for push notifications."
+        },
+        "fcmTokens": {
+          "type": "array",
+          "description": "A list of up to 5 FCM tokens for multi-device push notifications.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notificationPrefs": {
+          "type": "boolean",
+          "description": "A map where keys are notification types (e.g., 'postLike') and values are booleans indicating user preference for receiving that notification."
+        },
+        "quietHoursStart": {
+          "type": "string",
+          "description": "Start time in HH:MM format for suppressing push notifications."
+        },
+        "quietHoursEnd": {
+          "type": "string",
+          "description": "End time in HH:MM format for suppressing push notifications."
+        },
+        "followerIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who follow this user. (Relationship: UserProfile N:N UserProfile)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "followingIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users this user is following. (Relationship: UserProfile N:N UserProfile)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockedUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users blocked by this user. (Relationship: UserProfile N:N UserProfile)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "onboardingComplete": {
+          "type": "boolean",
+          "description": "True if the initial onboarding wizard has been completed by the user."
+        },
+        "twoFactorEnabled": {
+          "type": "boolean",
+          "description": "True if Two-Factor Authentication (2FA) is enabled for the user."
+        },
+        "lastSeenAt": {
+          "type": "string",
+          "description": "Timestamp of the user's last active presence on the platform.",
+          "format": "date-time"
+        },
+        "joinedAt": {
+          "type": "string",
+          "description": "Timestamp of account creation.",
+          "format": "date-time"
+        },
+        "postCount": {
+          "type": "number",
+          "description": "Denormalized count of posts created by the user."
+        },
+        "socialLink": {
+          "type": "string",
+          "description": "Optional social media profile link for the user.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "email",
+        "username",
+        "fullName",
+        "role",
+        "isVerified",
+        "isActive",
+        "isSuspended",
+        "onboardingComplete",
+        "joinedAt"
+      ]
+    },
+    "Post": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Post",
+      "type": "object",
+      "description": "Represents a social media post created by a user, including text, media, and engagement metrics.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Post entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Post)"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Post)"
+        },
+        "text": {
+          "type": "string",
+          "description": "Main content of the post (max 1,000 characters)."
+        },
+        "mediaUrls": {
+          "type": "array",
+          "description": "Cloudinary URLs for images/videos attached to the post (max 4 images or 1 video).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hashtagIds": {
+          "type": "array",
+          "description": "References to Hashtags. IDs of hashtags associated with the post. (Relationship: Hashtag N:N Post)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "likeUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who liked the post. (Relationship: UserProfile N:N Post)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "commentCount": {
+          "type": "number",
+          "description": "Denormalized count of comments on the post."
+        },
+        "isAnnouncement": {
+          "type": "boolean",
+          "description": "True if this post is also an official announcement (legacy/redundant if 'Announcement' entity is primary)."
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True if the post is soft-deleted for audit purposes."
+        },
+        "isFlagged": {
+          "type": "boolean",
+          "description": "True if the post has been flagged for moderation."
+        },
+        "reportedByUniqueUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of unique users who reported the post for auto-flagging logic. (Relationship: UserProfile N:N Post)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pollId": {
+          "type": "string",
+          "description": "Reference to Poll. (Relationship: Post 1:1 Poll)"
+        },
+        "contentWarningText": {
+          "type": "string",
+          "description": "Text describing the content warning for the post (e.g., 'mental health', 'politics')."
+        },
+        "audience": {
+          "type": "string",
+          "description": "The visibility setting for the post: 'Everyone' or 'Followers only'."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of post creation.",
+          "format": "date-time"
+        },
+        "editedAt": {
+          "type": "string",
+          "description": "Timestamp of the last edit to the post.",
+          "format": "date-time"
+        },
+        "shareCount": {
+          "type": "number",
+          "description": "Denormalized count of times the post's direct link has been copied/shared."
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "authorId",
+        "text",
+        "isDeleted",
+        "isFlagged",
+        "createdAt"
+      ]
+    },
+    "Comment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Comment",
+      "type": "object",
+      "description": "Represents a comment made on a post.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Comment entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Comment)"
+        },
+        "postId": {
+          "type": "string",
+          "description": "Reference to Post. (Relationship: Post 1:N Comment)"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Comment)"
+        },
+        "text": {
+          "type": "string",
+          "description": "Content of the comment (max 500 characters)."
+        },
+        "parentCommentId": {
+          "type": "string",
+          "description": "Reference to Comment. ID of the parent comment if this is a reply. (Relationship: Comment 1:N Comment)"
+        },
+        "likeUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who liked the comment. (Relationship: UserProfile N:N Comment)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True if the comment is soft-deleted."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of comment creation.",
+          "format": "date-time"
+        },
+        "editedAt": {
+          "type": "string",
+          "description": "Timestamp of the last edit to the comment.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "postId",
+        "authorId",
+        "text",
+        "isDeleted",
+        "createdAt"
+      ]
+    },
+    "Conversation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Conversation",
+      "type": "object",
+      "description": "Represents a direct message or group chat conversation between users.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Conversation entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Conversation)"
+        },
+        "participantIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of all users participating in the conversation. (Relationship: UserProfile N:N Conversation)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isGroup": {
+          "type": "boolean",
+          "description": "True if it's a group chat, false for 1-on-1 direct messages."
+        },
+        "groupName": {
+          "type": "string",
+          "description": "The name of the group chat."
+        },
+        "groupAvatarUrl": {
+          "type": "string",
+          "description": "URL for the group chat avatar.",
+          "format": "uri"
+        },
+        "groupAdminUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users with admin privileges in the group chat. (Relationship: UserProfile N:N Conversation)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastMessageText": {
+          "type": "string",
+          "description": "Preview text of the last message in the conversation."
+        },
+        "lastMessageAt": {
+          "type": "string",
+          "description": "Timestamp of the last message in the conversation.",
+          "format": "date-time"
+        },
+        "unreadCounts": {
+          "type": "number",
+          "description": "A map where keys are UserProfile IDs and values are numbers representing unread message counts for that user in the conversation."
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "description": "True if the conversation is blocked by one of the participants."
+        },
+        "typingStatus": {
+          "type": "string",
+          "description": "A map where keys are UserProfile IDs and values are date-time strings indicating the last time a user typed in the conversation."
+        },
+        "isStudyGroup": {
+          "type": "boolean",
+          "description": "True if this conversation is a study group chat."
+        },
+        "courseCode": {
+          "type": "string",
+          "description": "The course code if the conversation is a study group."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of conversation creation.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "participantIds",
+        "isGroup",
+        "lastMessageAt",
+        "createdAt"
+      ]
+    },
+    "Message": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Message",
+      "type": "object",
+      "description": "Represents a single message within a conversation.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Message entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Message)"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Reference to Conversation. (Relationship: Conversation 1:N Message)"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Message)"
+        },
+        "text": {
+          "type": "string",
+          "description": "Content of the message."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of message: 'text', 'image', 'file', 'voice', 'system'."
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "URL for attached media/file (Cloudinary or Firebase Storage).",
+          "format": "uri"
+        },
+        "mediaName": {
+          "type": "string",
+          "description": "Original filename for attached file."
+        },
+        "mediaSize": {
+          "type": "number",
+          "description": "Size of attached file in bytes."
+        },
+        "parentMessageId": {
+          "type": "string",
+          "description": "Reference to Message. ID of the message this one is replying to. (Relationship: Message 1:N Message)"
+        },
+        "reactions": {
+          "type": "string",
+          "description": "A map where keys are emoji characters and values are arrays of UserProfile IDs who reacted with that emoji."
+        },
+        "readByUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who have read this message. (Relationship: UserProfile N:N Message)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "True if the message is soft-deleted."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of message creation.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "conversationId",
+        "senderId",
+        "type",
+        "isDeleted",
+        "createdAt"
+      ]
+    },
+    "Event": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Event",
+      "type": "object",
+      "description": "Represents an event created by a user or administrator.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Event entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Event)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the event (max 100 characters)."
+        },
+        "organiserId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Event)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the event (max 2,000 characters)."
+        },
+        "bannerImageUrl": {
+          "type": "string",
+          "description": "Cloudinary URL for the event banner image.",
+          "format": "uri"
+        },
+        "locationName": {
+          "type": "string",
+          "description": "Text description of the event location (max 200 characters)."
+        },
+        "locationType": {
+          "type": "string",
+          "description": "The type of event location: 'In Person', 'Online', 'Hybrid'."
+        },
+        "meetingLink": {
+          "type": "string",
+          "description": "Meeting link for online events (if locationType is Online/Hybrid).",
+          "format": "uri"
+        },
+        "locationRoom": {
+          "type": "string",
+          "description": "Specific room or building for in-person events."
+        },
+        "campusMapPinCoordinates": {
+          "type": "string",
+          "description": "Coordinates (latitude, longitude) for a pin on the campus map."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date and time of the event.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date and time of the event.",
+          "format": "date-time"
+        },
+        "isAllDay": {
+          "type": "boolean",
+          "description": "True if the event spans a full day."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the event: 'Social', 'Academic', 'Sports', 'Club/Society', 'Career', 'Cultural', 'Religious', 'Emergency'."
+        },
+        "tagIds": {
+          "type": "array",
+          "description": "References to Hashtags. IDs of tags associated with the event. (Relationship: Hashtag N:N Event)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxAttendees": {
+          "type": "number",
+          "description": "Maximum number of attendees allowed (optional)."
+        },
+        "rsvpGoingUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who RSVP'd 'Going'. (Relationship: UserProfile N:N Event)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rsvpMaybeUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who RSVP'd 'Maybe'. (Relationship: UserProfile N:N Event)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rsvpNotGoingUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who RSVP'd 'Not Going'. (Relationship: UserProfile N:N Event)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "qrCodeSecret": {
+          "type": "string",
+          "description": "Server-side secret for QR code check-in validation (not the QR code itself)."
+        },
+        "checkedInUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who have checked in at the event. (Relationship: UserProfile N:N Event)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isCancelled": {
+          "type": "boolean",
+          "description": "True if the event is cancelled."
+        },
+        "cancellationReason": {
+          "type": "string",
+          "description": "Reason provided for event cancellation."
+        },
+        "isOfficial": {
+          "type": "boolean",
+          "description": "True if it's an official university event (admin-created)."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "Reference to Club. (Relationship: Club 1:N Event)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of event creation.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "title",
+        "organiserId",
+        "description",
+        "locationName",
+        "startDate",
+        "endDate",
+        "category",
+        "isCancelled",
+        "createdAt"
+      ]
+    },
+    "EventPhoto": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "EventPhoto",
+      "type": "object",
+      "description": "Represents a photo uploaded to a shared event album after an event.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the EventPhoto entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N EventPhoto)"
+        },
+        "eventId": {
+          "type": "string",
+          "description": "Reference to Event. (Relationship: Event 1:N EventPhoto)"
+        },
+        "uploaderId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N EventPhoto)"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Cloudinary URL of the photo.",
+          "format": "uri"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of photo upload.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "eventId",
+        "uploaderId",
+        "imageUrl",
+        "createdAt"
+      ]
+    },
+    "Listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Listing",
+      "type": "object",
+      "description": "Represents a marketplace listing created by a student.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Listing entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Listing)"
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Listing)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the listing (max 100 characters)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the item (max 1,000 characters)."
+        },
+        "imageUrls": {
+          "type": "array",
+          "description": "Cloudinary URLs for images associated with the listing (up to 5 images).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "price": {
+          "type": "number",
+          "description": "Price of the item (0 for Free/Swap)."
+        },
+        "isNegotiable": {
+          "type": "boolean",
+          "description": "True if the price is negotiable."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of listing: 'Sale', 'Swap', 'Free'."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the listing: 'Textbooks & Notes', 'Electronics', 'Furniture', 'Clothing', 'Stationery', 'Food & Meal Plans', 'Accommodation', 'Services', 'Other'."
+        },
+        "condition": {
+          "type": "string",
+          "description": "Condition grade of the item: 'New', 'Like New', 'Good', 'Fair', 'Poor'."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the listing: 'Active', 'Sold', 'Reserved', 'Withdrawn', 'Expired'."
+        },
+        "preferredPickupLocation": {
+          "type": "string",
+          "description": "Optional preferred location for item pickup."
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Timestamp when the listing will automatically expire.",
+          "format": "date-time"
+        },
+        "interestedBuyerIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who expressed interest in the listing. (Relationship: UserProfile N:N Listing)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "savedByUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who saved/bookmarked the listing. (Relationship: UserProfile N:N Listing)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of listing creation.",
+          "format": "date-time"
+        },
+        "viewCount": {
+          "type": "number",
+          "description": "Denormalized count of times the listing has been viewed."
+        },
+        "isRoommateFinder": {
+          "type": "boolean",
+          "description": "True if this listing is part of the roommate finder sub-section."
+        },
+        "roommateLocationPreference": {
+          "type": "string",
+          "description": "Preferred location for a roommate, if applicable."
+        },
+        "roommateBudget": {
+          "type": "string",
+          "description": "Preferred budget for a roommate, if applicable."
+        },
+        "roommateGenderPreference": {
+          "type": "string",
+          "description": "Preferred gender for a roommate, if applicable."
+        },
+        "roommateMoveInDate": {
+          "type": "string",
+          "description": "Preferred move-in date for a roommate, if applicable.",
+          "format": "date"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "sellerId",
+        "title",
+        "type",
+        "category",
+        "condition",
+        "status",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    "HelpDeskTicket": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HelpDeskTicket",
+      "type": "object",
+      "description": "Represents a support ticket submitted by a student to the help desk.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the HelpDeskTicket entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N HelpDeskTicket)"
+        },
+        "submitterId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N HelpDeskTicket)"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject of the ticket (max 150 characters)."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the ticket: 'Academic', 'Technical', 'Financial', 'Accommodation', 'Disciplinary', 'Wellbeing', 'General Inquiry'."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the issue (max 2,000 characters)."
+        },
+        "attachmentUrls": {
+          "type": "array",
+          "description": "URLs for attached files (PDF, images - max 10MB each, up to 3 files).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "priority": {
+          "type": "string",
+          "description": "Student-assigned priority for the ticket: 'Low', 'Medium', 'High', 'Urgent'."
+        },
+        "adminAssignedPriority": {
+          "type": "string",
+          "description": "Admin-assigned priority for the ticket (can override student's)."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the ticket: 'Open', 'In Progress', 'Resolved', 'Closed'."
+        },
+        "assignedToUserId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the admin/staff member assigned to the ticket. (Relationship: UserProfile 1:N HelpDeskTicket)"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "description": "Timestamp when the ticket was resolved.",
+          "format": "date-time"
+        },
+        "reopenedCount": {
+          "type": "number",
+          "description": "Count of times the ticket was reopened after being marked resolved."
+        },
+        "isWellbeingTicket": {
+          "type": "boolean",
+          "description": "True if the category is 'Wellbeing', routing to a restricted queue."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of ticket submission.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of the last update or reply to the ticket.",
+          "format": "date-time"
+        },
+        "satisfactionRating": {
+          "type": "string",
+          "description": "Student's rating of the resolution: 'Resolved', 'Partially Resolved', 'Unresolved'."
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "submitterId",
+        "subject",
+        "category",
+        "description",
+        "priority",
+        "status",
+        "createdAt"
+      ]
+    },
+    "HelpDeskReply": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HelpDeskReply",
+      "type": "object",
+      "description": "Represents a reply within a help desk ticket thread.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the HelpDeskReply entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N HelpDeskReply)"
+        },
+        "ticketId": {
+          "type": "string",
+          "description": "Reference to HelpDeskTicket. (Relationship: HelpDeskTicket 1:N HelpDeskReply)"
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N HelpDeskReply)"
+        },
+        "text": {
+          "type": "string",
+          "description": "Content of the reply."
+        },
+        "attachmentUrls": {
+          "type": "array",
+          "description": "URLs for attached files in the reply.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isFromAdmin": {
+          "type": "boolean",
+          "description": "True if the sender of the reply is an administrator."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of the reply.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "ticketId",
+        "senderId",
+        "text",
+        "createdAt"
+      ]
+    },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "Represents an in-app or push notification sent to a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Notification entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Notification)"
+        },
+        "recipientId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:N Notification)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of notification: 'postLike', 'postComment', 'commentLike', 'newFollower', 'directMessage', 'groupMessageMention', 'announcement', 'eventReminder', 'marketplaceInterest', 'helpDeskReply', 'wellbeingTicketUpdate', 'mention'."
+        },
+        "text": {
+          "type": "string",
+          "description": "Display text content of the notification."
+        },
+        "link": {
+          "type": "string",
+          "description": "Deep link URL to the relevant content in the app.",
+          "format": "uri"
+        },
+        "isRead": {
+          "type": "boolean",
+          "description": "True if the notification has been read by the recipient."
+        },
+        "actorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the user who triggered the notification (e.g., the one who liked a post). (Relationship: UserProfile 1:N Notification)"
+        },
+        "meta": {
+          "type": "string",
+          "description": "Additional metadata specific to the notification type (e.g., postId, commentId, conversationId)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of notification creation.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "recipientId",
+        "type",
+        "text",
+        "link",
+        "isRead",
+        "createdAt"
+      ]
+    },
+    "Announcement": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Announcement",
+      "type": "object",
+      "description": "Represents an official university announcement broadcasted by an administrator, separate from regular posts for analytics.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Announcement entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Announcement)"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the admin who authored the announcement. (Relationship: UserProfile 1:N Announcement)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional title for the announcement (max 100 characters)."
+        },
+        "text": {
+          "type": "string",
+          "description": "Body content of the announcement (max 1,000 characters)."
+        },
+        "priority": {
+          "type": "string",
+          "description": "Priority level of the announcement: 'Normal', 'Urgent', 'Emergency'."
+        },
+        "targetType": {
+          "type": "string",
+          "description": "Defines the target audience: 'All Students', 'By Year', 'By Faculty', 'By Department', 'Custom'."
+        },
+        "targetYears": {
+          "type": "array",
+          "description": "Specific years targeted (if targetType is By Year/Custom).",
+          "items": {
+            "type": "number"
+          }
+        },
+        "targetFaculty": {
+          "type": "string",
+          "description": "Specific faculty targeted (if targetType is By Faculty/Custom)."
+        },
+        "targetDepartment": {
+          "type": "string",
+          "description": "Specific department targeted (if targetType is By Department/Custom)."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the announcement: 'draft', 'scheduled', 'sending', 'sent', 'failed'."
+        },
+        "scheduledFor": {
+          "type": "string",
+          "description": "Timestamp for future delivery if the announcement is scheduled.",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Timestamp when the announcement expires from the feed's pinned position.",
+          "format": "date-time"
+        },
+        "aiAssisted": {
+          "type": "boolean",
+          "description": "True if AI assistance was used for drafting the announcement."
+        },
+        "totalRecipientsCount": {
+          "type": "number",
+          "description": "Estimated total recipients for the announcement."
+        },
+        "fcmSentCount": {
+          "type": "number",
+          "description": "Count of Firebase Cloud Messaging tokens sent to."
+        },
+        "fcmDeliveredCount": {
+          "type": "number",
+          "description": "Count of confirmed FCM deliveries."
+        },
+        "fcmFailedCount": {
+          "type": "number",
+          "description": "Count of failed FCM deliveries."
+        },
+        "inAppImpressionsCount": {
+          "type": "number",
+          "description": "Count of in-app feed impressions for the announcement."
+        },
+        "uniqueOpensCount": {
+          "type": "number",
+          "description": "Count of unique users who opened the announcement."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of announcement creation.",
+          "format": "date-time"
+        },
+        "sentAt": {
+          "type": "string",
+          "description": "Timestamp when the announcement was actually sent.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "authorId",
+        "text",
+        "priority",
+        "targetType",
+        "status",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    "Club": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Club",
+      "type": "object",
+      "description": "Represents a student club or society page.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Club entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Club)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the club/society."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the club."
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL for the club's avatar.",
+          "format": "uri"
+        },
+        "coverPhotoUrl": {
+          "type": "string",
+          "description": "URL for the club's cover photo.",
+          "format": "uri"
+        },
+        "tagIds": {
+          "type": "array",
+          "description": "References to Hashtags. IDs of tags associated with the club. (Relationship: Hashtag N:N Club)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "adminUserId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the main club administrator. (Relationship: UserProfile 1:N Club)"
+        },
+        "memberUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users who are members of the club. (Relationship: UserProfile N:N Club)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "moderatorUserIds": {
+          "type": "array",
+          "description": "References to UserProfiles. IDs of users with moderator roles within the club. (Relationship: UserProfile N:N Club)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "True if the club is official and admin-approved."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of club creation.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "name",
+        "description",
+        "adminUserId",
+        "isVerified",
+        "createdAt"
+      ]
+    },
+    "Poll": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Poll",
+      "type": "object",
+      "description": "Represents a poll attached to a social media post.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Poll entity. Should match the parent Post ID for a 1:1 relationship."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Poll)"
+        },
+        "postId": {
+          "type": "string",
+          "description": "Reference to Post. (Relationship: Post 1:1 Poll)"
+        },
+        "options": {
+          "type": "array",
+          "description": "An array of poll options, each with text and a denormalized vote count.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "votedByUserIds": {
+          "type": "string",
+          "description": "A map where keys are UserProfile IDs and values are numbers representing the index of the option the user voted for. (Relationship: UserProfile N:N Poll)"
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Timestamp when the poll expires and voting is no longer allowed.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of poll creation.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "postId",
+        "options",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    "Report": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Report",
+      "type": "object",
+      "description": "Represents a report made by a user against content or another user for moderation review.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Report entity."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Report)"
+        },
+        "reporterId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the user who submitted the report. (Relationship: UserProfile 1:N Report)"
+        },
+        "reportedEntityType": {
+          "type": "string",
+          "description": "The type of entity being reported: 'Post', 'Comment', 'User', 'Listing', 'Event', 'Message'."
+        },
+        "reportedEntityId": {
+          "type": "string",
+          "description": "ID of the specific entity being reported."
+        },
+        "categories": {
+          "type": "array",
+          "description": "Categories of the report: 'Spam', 'Misinformation', 'Harassment', 'Hate speech', 'Inappropriate content', 'Intellectual property', 'Other'.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "details": {
+          "type": "string",
+          "description": "Optional text field for additional details provided by the reporter."
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the report: 'Pending Review', 'Reviewed - Dismissed', 'Reviewed - Action Taken'."
+        },
+        "moderatorAction": {
+          "type": "string",
+          "description": "Description of the action taken by a moderator (e.g., 'Post Removed', 'User Suspended')."
+        },
+        "moderatorNotes": {
+          "type": "string",
+          "description": "Internal notes from the moderator regarding the report."
+        },
+        "moderatorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the moderator who handled the report. (Relationship: UserProfile 1:N Report)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the report was created.",
+          "format": "date-time"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "description": "Timestamp when the report was resolved.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "reporterId",
+        "reportedEntityType",
+        "reportedEntityId",
+        "categories",
+        "status",
+        "createdAt"
+      ]
+    },
+    "ModerationLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ModerationLog",
+      "type": "object",
+      "description": "An immutable log of all moderation actions performed by administrators for auditing purposes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ModerationLog entry."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N ModerationLog)"
+        },
+        "moderatorId": {
+          "type": "string",
+          "description": "Reference to UserProfile. ID of the administrator who performed the action. (Relationship: UserProfile 1:N ModerationLog)"
+        },
+        "actionType": {
+          "type": "string",
+          "description": "The type of moderation action performed (e.g., 'Post Removed', 'User Suspended')."
+        },
+        "targetEntityType": {
+          "type": "string",
+          "description": "The type of entity targeted by the action: 'Post', 'User', 'Announcement', 'HelpDeskTicket', 'Listing'."
+        },
+        "targetEntityId": {
+          "type": "string",
+          "description": "ID of the entity affected by the moderation action."
+        },
+        "details": {
+          "type": "string",
+          "description": "Detailed description of the action, including reasons, specific content, or duration."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of the moderation action.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "moderatorId",
+        "actionType",
+        "targetEntityType",
+        "targetEntityId",
+        "createdAt"
+      ]
+    },
+    "Hashtag": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Hashtag",
+      "type": "object",
+      "description": "Represents a hashtag used for content categorization and discovery.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Hashtag entity (often the hashtag text itself, e.g., 'campuslife')."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N Hashtag)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The actual hashtag text (e.g., 'campuslife')."
+        },
+        "postCount": {
+          "type": "number",
+          "description": "Denormalized count of posts that use this hashtag."
+        },
+        "eventCount": {
+          "type": "number",
+          "description": "Denormalized count of events that use this hashtag."
+        },
+        "lastUsedAt": {
+          "type": "string",
+          "description": "Timestamp of the last time this hashtag was used in a post or event.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "name",
+        "postCount"
+      ]
+    },
+    "UserTimetable": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserTimetable",
+      "type": "object",
+      "description": "Stores a student's personal course timetable, parsed from CSV or iCal, typically a sub-collection of UserProfile.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserTimetable entity (e.g., 'current' for the active timetable)."
+        },
+        "universityId": {
+          "type": "string",
+          "description": "Reference to University. (Relationship: University 1:N UserTimetable)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: UserProfile 1:1 UserTimetable)"
+        },
+        "courses": {
+          "type": "array",
+          "description": "An array of course slots, each describing a class with its details.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enableReminders": {
+          "type": "boolean",
+          "description": "True if class reminders are enabled for this timetable."
+        },
+        "lastUpdatedAt": {
+          "type": "string",
+          "description": "Timestamp of the last update or import of the timetable.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "universityId",
+        "userId",
+        "courses",
+        "lastUpdatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/universities/{universityId}",
+        "definition": {
+          "entityName": "University",
+          "schema": {
+            "$ref": "#/backend/entities/University"
+          },
+          "description": "Stores configuration and global settings for a specific university. Accessible for reads by any authenticated user in the university, writes restricted to platform superadmins.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/userProfiles/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores detailed user profiles, including denormalized 'universityId', 'role', 'followerIds', 'followingIds', and 'blockedUserIds' for efficient access control and relationship management. Self-owned for writes, readable by other university members (unless blocked).",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university this user belongs to."
+            },
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user profile, matching Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/posts/{postId}",
+        "definition": {
+          "entityName": "Post",
+          "schema": {
+            "$ref": "#/backend/entities/Post"
+          },
+          "description": "Stores social media posts. Includes denormalized 'universityId', 'authorId', and 'audience' ('Everyone', 'Followers only') for read access control. 'isFlagged' supports moderation, 'likeUserIds' and 'reportedByUniqueUserIds' for engagement and reporting. Enables secure list operations.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university the post belongs to."
+            },
+            {
+              "name": "postId",
+              "description": "The unique identifier for the post."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/posts/{postId}/comments/{commentId}",
+        "definition": {
+          "entityName": "Comment",
+          "schema": {
+            "$ref": "#/backend/entities/Comment"
+          },
+          "description": "Stores comments on a post. Includes denormalized 'universityId', 'postId', and 'authorId' for direct access control. Read access is public if the parent post is public.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "postId",
+              "description": "The unique identifier of the parent post."
+            },
+            {
+              "name": "commentId",
+              "description": "The unique identifier for the comment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/conversations/{conversationId}",
+        "definition": {
+          "entityName": "Conversation",
+          "schema": {
+            "$ref": "#/backend/entities/Conversation"
+          },
+          "description": "Stores metadata for direct messages or group chats. Includes denormalized 'universityId' and 'participantIds' array for access control (using 'array-contains' queries). 'isBlocked' is denormalized for security rule checks.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "conversationId",
+              "description": "The unique identifier for the conversation."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/conversations/{conversationId}/messages/{messageId}",
+        "definition": {
+          "entityName": "Message",
+          "schema": {
+            "$ref": "#/backend/entities/Message"
+          },
+          "description": "Stores individual messages within a conversation. Includes denormalized 'universityId', 'conversationId', 'senderId', and critically, 'participantIds' (copied from parent Conversation) for authorization independence.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "conversationId",
+              "description": "The unique identifier of the parent conversation."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier for the message."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/events/{eventId}",
+        "definition": {
+          "entityName": "Event",
+          "schema": {
+            "$ref": "#/backend/entities/Event"
+          },
+          "description": "Stores university events. Includes denormalized 'universityId', 'organiserId', 'rsvpGoingUserIds', and 'checkedInUserIds' for participant management, access to restricted content (e.g., meeting links), and check-in validation. 'isOfficial' for admin events.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "eventId",
+              "description": "The unique identifier for the event."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/events/{eventId}/photos/{photoId}",
+        "definition": {
+          "entityName": "EventPhoto",
+          "schema": {
+            "$ref": "#/backend/entities/EventPhoto"
+          },
+          "description": "Stores photos uploaded to an event's shared album. Includes denormalized 'universityId', 'eventId', 'uploaderId', and critically, 'eventRsvpGoingUserIds' and 'eventCheckedInUserIds' (copied from parent Event) for authorization independence.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "eventId",
+              "description": "The unique identifier of the parent event."
+            },
+            {
+              "name": "photoId",
+              "description": "The unique identifier for the event photo."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/listings/{listingId}",
+        "definition": {
+          "entityName": "Listing",
+          "schema": {
+            "$ref": "#/backend/entities/Listing"
+          },
+          "description": "Stores marketplace listings. Includes denormalized 'universityId', 'sellerId', and 'status' for access control and listing management. 'savedByUserIds' for user-specific saved items.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "listingId",
+              "description": "The unique identifier for the marketplace listing."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/helpDeskTickets/{ticketId}",
+        "definition": {
+          "entityName": "HelpDeskTicket",
+          "schema": {
+            "$ref": "#/backend/entities/HelpDeskTicket"
+          },
+          "description": "Stores support tickets. Includes denormalized 'universityId', 'submitterId', 'assignedToUserId', 'category', and 'isWellbeingTicket' for access control and routing to specific admin roles.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "ticketId",
+              "description": "The unique identifier for the help desk ticket."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/helpDeskTickets/{ticketId}/replies/{replyId}",
+        "definition": {
+          "entityName": "HelpDeskReply",
+          "schema": {
+            "$ref": "#/backend/entities/HelpDeskReply"
+          },
+          "description": "Stores replies within a help desk ticket. Includes denormalized 'universityId', 'ticketId', 'senderId', 'isFromAdmin', and critically, 'ticketSubmitterId', 'ticketAssignedToUserId', 'ticketIsWellbeingTicket' (copied from parent ticket) for authorization independence.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "ticketId",
+              "description": "The unique identifier of the parent help desk ticket."
+            },
+            {
+              "name": "replyId",
+              "description": "The unique identifier for the reply."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/userProfiles/{recipientId}/notifications/{notificationId}",
+        "definition": {
+          "entityName": "Notification",
+          "schema": {
+            "$ref": "#/backend/entities/Notification"
+          },
+          "description": "Stores personal notifications for a user. Path-based ownership ensures privacy, allowing only the 'recipientId' to read. Includes denormalized 'universityId' and 'recipientId' for access and management.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "recipientId",
+              "description": "The unique identifier for the user receiving the notification."
+            },
+            {
+              "name": "notificationId",
+              "description": "The unique identifier for the notification."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/announcements/{announcementId}",
+        "definition": {
+          "entityName": "Announcement",
+          "schema": {
+            "$ref": "#/backend/entities/Announcement"
+          },
+          "description": "Stores official university announcements. Includes denormalized 'universityId', 'authorId', 'priority', 'targetType', 'targetYears', 'targetFaculty', and 'targetDepartment' for robust access control and audience segmentation, critical for QAPs. 'status' for lifecycle management.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "announcementId",
+              "description": "The unique identifier for the announcement."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/clubs/{clubId}",
+        "definition": {
+          "entityName": "Club",
+          "schema": {
+            "$ref": "#/backend/entities/Club"
+          },
+          "description": "Stores information for student clubs/societies. Includes denormalized 'universityId', 'adminUserId', 'memberUserIds', and 'moderatorUserIds' for membership-based access control.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "clubId",
+              "description": "The unique identifier for the club."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/posts/{postId}/polls/{pollId}",
+        "definition": {
+          "entityName": "Poll",
+          "schema": {
+            "$ref": "#/backend/entities/Poll"
+          },
+          "description": "Stores poll details associated with a post. Includes denormalized 'universityId', 'postId', and 'votedByUserIds' (intended as a map 'votedByUserSelections: { [uid: string]: number }') for vote tracking and ensuring authorization independence for voting.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "postId",
+              "description": "The unique identifier of the parent post."
+            },
+            {
+              "name": "pollId",
+              "description": "The unique identifier for the poll."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/reports/{reportId}",
+        "definition": {
+          "entityName": "Report",
+          "schema": {
+            "$ref": "#/backend/entities/Report"
+          },
+          "description": "Stores user-submitted content reports. Includes denormalized 'universityId', 'reporterId', 'reportedEntityType', 'reportedEntityId', and 'status' for administrative access and moderation tracking.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "reportId",
+              "description": "The unique identifier for the report."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/moderationLogs/{logId}",
+        "definition": {
+          "entityName": "ModerationLog",
+          "schema": {
+            "$ref": "#/backend/entities/ModerationLog"
+          },
+          "description": "An immutable log of moderation actions. Includes denormalized 'universityId', 'moderatorId', 'actionType', 'targetEntityType', and 'targetEntityId' for audit purposes. Read-only for admins/superadmins.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "logId",
+              "description": "The unique identifier for the moderation log entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/hashtags/{hashtagId}",
+        "definition": {
+          "entityName": "Hashtag",
+          "schema": {
+            "$ref": "#/backend/entities/Hashtag"
+          },
+          "description": "Stores details and usage counts for hashtags. Includes denormalized 'universityId' and 'postCount' for efficient querying and display. Publicly readable within the university.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "hashtagId",
+              "description": "The unique identifier for the hashtag (usually the hashtag text itself)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/universities/{universityId}/userProfiles/{userId}/timetables/{timetableId}",
+        "definition": {
+          "entityName": "UserTimetable",
+          "schema": {
+            "$ref": "#/backend/entities/UserTimetable"
+          },
+          "description": "Stores a user's personal course timetable. Path-based ownership ensures privacy, allowing only the 'userId' to read. Includes denormalized 'universityId' and 'userId' for access control.",
+          "params": [
+            {
+              "name": "universityId",
+              "description": "The unique identifier for the university."
+            },
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user profile this timetable belongs to."
+            },
+            {
+              "name": "timetableId",
+              "description": "The unique identifier for the user's timetable (e.g., 'current')."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure for Dash — Campus Connect is designed with a strong emphasis on multi-tenancy, Authorization Independence, and support for secure `list` operations (QAPs - Rules are not Filters). All top-level collections are namespaced under `/universities/{universityId}` to enforce strict campus isolation, ensuring that data from one university is never exposed to another.\n\n**Authorization Independence & Denormalization:**\n\n1.  **University-Level Isolation:** Every document includes a `universityId` field, allowing Firestore security rules to easily enforce that `request.resource.data.universityId == universityId` (from the path) and `request.auth.uid` belongs to that university (by checking `get(/universities/{universityId}/userProfiles/$(request.auth.uid)).data.universityId`). This avoids `get()` calls for cross-university checks.\n\n2.  **Self-Contained Authorization for Subcollections:** A critical mandate is to avoid hierarchical authorization dependencies (`get()`) that rely on a parent document's attributes for a subcollection's access. To achieve this, key authorization fields from parent documents are *denormalized* into their subcollection documents:\n    *   `Message` documents (under `conversations/{conversationId}/messages`) explicitly contain `participantIds` from their parent `Conversation` to authorize reads/writes without needing to `get()` the parent conversation.\n    *   `EventPhoto` documents (under `events/{eventId}/photos`) contain `eventRsvpGoingUserIds` and `eventCheckedInUserIds` from their parent `Event` to control who can view or upload photos to the album.\n    *   `HelpDeskReply` documents (under `helpDeskTickets/{ticketId}/replies`) contain `ticketSubmitterId`, `ticketAssignedToUserId`, and `ticketIsWellbeingTicket` from their parent `HelpDeskTicket` to enable appropriate access for the submitter and assigned admins.\n    This denormalization ensures that each document carries its full authorization context, simplifying security rules and preventing issues with atomic operations.\n\n3.  **Path-Based Ownership:** For private user data like `notifications` and `userTimetables`, a path structure like `/universities/{universityId}/userProfiles/{userId}/notifications/{notificationId}` is used. This makes ownership explicit, allowing security rules to simply check `request.auth.uid == userId` for granular control.\n\n4.  **Membership Maps:** For collaborative data like `Conversations` and `Clubs`, `participantIds`, `memberUserIds`, or `moderatorUserIds` arrays are stored directly on the document. Rules can efficiently check `request.auth.uid in resource.data.participantIds` for authorization.\n\n**QAPs (Rules are not Filters) Support:**\n\nTo enable secure `list` operations without relying on client-side filtering:\n\n1.  **Explicit Audience Fields:** For `Post` and `Announcement` entities, fields like `audience` (`'Everyone'`, `'Followers only'`) and detailed `targetType` (`'All Students'`, `'By Year'`, `'By Faculty'`) are stored directly on the documents. This allows security rules to filter `list` queries based on these fields.\n\n2.  **Requesting User's Profile for Permissions:** In cases like a 'Followers only' post, where access depends on the *requesting user's* relationship to the author, the security rules can perform a `get()` call to `request.auth.uid`'s own `UserProfile` document to retrieve their `followingIds` array. This is a deliberate and controlled exception to the 'AVOID get()' principle for *read* operations, as it inspects the *requester's own* attributes rather than external document dependencies, making the `list` operation secure and adhering to QAPs.\n\n3.  **DBAC (Database Access Control):** User roles (`student`, `admin`, `superadmin`, `wellbeing_admin`) are stored directly in the `UserProfile` document. Security rules utilize `get(/universities/{universityId}/userProfiles/$(request.auth.uid)).data.role` to determine administrative privileges for accessing collections like `reports`, `moderationLogs`, or restricted `helpDeskTickets`. This approach keeps roles in the database, simplifying management without relying on custom claims."
+  }
+}
