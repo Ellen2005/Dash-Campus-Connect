@@ -30,6 +30,24 @@
       "description": "Used textbook on a desk",
       "imageUrl": "https://picsum.photos/seed/dash5/400/300",
       "imageHint": "textbook"
+    },
+    {
+      "id": "event-banner-1",
+      "description": "Social gathering on campus lawn",
+      "imageUrl": "https://picsum.photos/seed/event1/800/450",
+      "imageHint": "campus social"
+    },
+    {
+      "id": "event-banner-2",
+      "description": "Academic lecture hall",
+      "imageUrl": "https://picsum.photos/seed/event2/800/450",
+      "imageHint": "lecture hall"
+    },
+    {
+      "id": "event-banner-3",
+      "description": "Sports tournament on field",
+      "imageUrl": "https://picsum.photos/seed/event3/800/450",
+      "imageHint": "college sports"
     }
   ]
 }
