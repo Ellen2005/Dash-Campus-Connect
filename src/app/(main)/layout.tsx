@@ -1,6 +1,7 @@
 
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, PlusSquare, User, Menu } from "lucide-react";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -10,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { GraduationCap, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
+import { GraduationCap, ArrowRight, ShieldCheck, Loader2, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RegisterPage() {
@@ -35,33 +34,31 @@ export default function RegisterPage() {
     setIsLoading(true);
     setError("");
 
-    // Domain validation (Mocked against university config logic)
-    if (!formData.email.endsWith(".edu") && !formData.email.includes(".ac.")) {
-      setError("This email address is not from a recognised university domain.");
-      setIsLoading(false);
-      return;
-    }
-
+    // Basic validation
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match.");
       setIsLoading(false);
       return;
     }
 
+    if (formData.username.length < 3 || formData.username.length > 30) {
+      setError("Username must be between 3 and 30 characters.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // Logic for Firebase Auth and Firestore User doc creation would go here
-      // For now, we simulate success and move to verification
+      // For now, we simulate success
       setTimeout(() => {
         toast({
           title: "Account Created",
-          description: "Please check your email for a verification link.",
+          description: "Welcome to Dash! Let's get your profile set up.",
         });
         router.push("/onboarding");
       }, 1500);
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");
-    } finally {
-      // Loading state cleared in timeout or catch
     }
   };
 
@@ -104,17 +101,17 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">University Email</Label>
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Email Address</Label>
               <div className="relative">
                 <Input 
                   type="email"
                   className="dash-input bg-obsidian/40 pl-10" 
-                  placeholder="student@university.edu"
+                  placeholder="your.email@example.com"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                 />
-                <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               </div>
             </div>
 
@@ -153,6 +150,7 @@ export default function RegisterPage() {
                     <SelectItem value="sci">Science</SelectItem>
                     <SelectItem value="art">Arts & Humanities</SelectItem>
                     <SelectItem value="bus">Business</SelectItem>
+                    <SelectItem value="med">Medicine</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -179,7 +177,7 @@ export default function RegisterPage() {
                 onCheckedChange={(checked) => setFormData({...formData, agreed: !!checked})}
               />
               <Label htmlFor="terms" className="text-xs text-muted-foreground leading-none">
-                I agree to the <Link href="#" className="text-gold hover:underline">Terms of Service</Link> and university privacy policy.
+                I agree to the <Link href="#" className="text-gold hover:underline">Terms of Service</Link> and privacy policy.
               </Label>
             </div>
 
@@ -208,7 +206,7 @@ export default function RegisterPage() {
           <div className="flex flex-col items-center gap-4 pt-6 border-t border-white/5">
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider">
               <ShieldCheck className="w-3 h-3 text-gold" />
-              Verified Campus Boundary Enforced
+              Institutional Security Layer Active
             </div>
             <p className="text-xs">
               Already have an account? <Link href="/login" className="text-gold font-bold hover:underline">Sign In</Link>

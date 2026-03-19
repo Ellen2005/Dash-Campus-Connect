@@ -15,8 +15,8 @@ export default function LoginPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.endsWith(".edu") && !email.includes(".ac.")) {
-      setError("Please use your verified institutional email address.");
+    if (!email.includes("@")) {
+      setError("Please enter a valid email address.");
       return;
     }
     setError("");
@@ -39,17 +39,17 @@ export default function LoginPage() {
         <div className="obsidian-card p-8 space-y-6 bg-card/50 backdrop-blur-md">
           <div className="space-y-2">
             <h2 className="text-xl font-headline font-bold">Sign In</h2>
-            <p className="text-xs text-muted-foreground">Verification required via institutional email</p>
+            <p className="text-xs text-muted-foreground">Enter your credentials to access the campus</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs uppercase tracking-widest text-muted-foreground">University Email</Label>
+              <Label htmlFor="email" className="text-xs uppercase tracking-widest text-muted-foreground">Email</Label>
               <div className="relative">
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="student@university.edu" 
+                  placeholder="alex@example.com" 
                   className="bg-background/50 border-border focus:border-primary pl-10"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -61,7 +61,7 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password text-xs uppercase tracking-widest text-muted-foreground">Password</Label>
+                <Label htmlFor="password" className="text-xs uppercase tracking-widest text-muted-foreground">Password</Label>
                 <Link href="#" className="text-[10px] text-primary hover:underline">Forgot password?</Link>
               </div>
               <Input 
@@ -90,7 +90,7 @@ export default function LoginPage() {
               Verified Campus Boundary Enforced
             </div>
             <p className="text-xs">
-              New here? <Link href="#" className="text-primary font-bold hover:underline">Join your university community</Link>
+              New here? <Link href="/register" className="text-gold font-bold hover:underline">Join your university community</Link>
             </p>
           </div>
         </div>

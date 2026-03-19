@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -12,6 +11,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { summarizePostContent } from "@/ai/flows/post-content-summarizer-flow";
+import { cn } from "@/lib/utils";
 
 interface PostCardProps {
   author: {
@@ -46,18 +46,21 @@ export function PostCard({ author, content, image, timestamp, likes, comments, i
   };
 
   return (
-    <div className={`obsidian-card p-5 space-y-4 ${isAnnouncement ? 'border-primary/40 bg-primary/5' : ''}`}>
+    <div className={cn(
+      "obsidian-card p-5 space-y-4 group",
+      isAnnouncement && "border-primary/40 bg-primary/5 ring-1 ring-primary/10"
+    )}>
       <div className="flex items-start justify-between">
         <div className="flex gap-3">
-          <Avatar className="w-10 h-10 border border-border">
+          <Avatar className="w-10 h-10 border border-border group-hover:border-gold/30 transition-colors">
             <AvatarImage src={author.avatar} />
             <AvatarFallback>{author.name[0]}</AvatarFallback>
           </Avatar>
           <div>
-            <div className="flex items-center gap-1">
-              <span className="font-headline font-semibold text-sm">{author.name}</span>
-              {author.isVerified && <div className="w-3 h-3 champagne-gradient rounded-full" />}
-              <span className="text-xs text-muted-foreground ml-1">@{author.username}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-headline font-bold text-sm">{author.name}</span>
+              {author.isVerified && <div className="w-3.5 h-3.5 champagne-gradient rounded-full flex items-center justify-center text-[8px] text-obsidian font-bold">✓</div>}
+              <span className="text-xs text-muted-foreground font-medium">@{author.username}</span>
             </div>
             <p className="text-[11px] text-muted-foreground">{timestamp}</p>
           </div>
@@ -68,10 +71,10 @@ export function PostCard({ author, content, image, timestamp, likes, comments, i
               <MoreHorizontal className="w-5 h-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-popover">
-            <DropdownMenuItem className="text-sm">Save Post</DropdownMenuItem>
-            <DropdownMenuItem className="text-sm text-destructive focus:text-destructive">
-              <Flag className="w-4 h-4 mr-2" />
+          <DropdownMenuContent align="end" className="bg-popover border-border">
+            <DropdownMenuItem className="text-xs font-bold">Save Post</DropdownMenuItem>
+            <DropdownMenuItem className="text-xs font-bold text-destructive focus:text-destructive">
+              <Flag className="w-3.5 h-3.5 mr-2" />
               Report
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -80,17 +83,17 @@ export function PostCard({ author, content, image, timestamp, likes, comments, i
 
       <div className="space-y-3">
         {summary ? (
-          <div className="bg-muted/50 p-3 rounded-lg border border-primary/20 relative animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 mb-1 text-[10px] font-bold text-primary uppercase tracking-widest">
+          <div className="bg-gold/5 p-4 rounded-xl border border-gold/10 relative animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-gold uppercase tracking-widest">
               <Sparkles className="w-3 h-3" />
-              AI Summary
+              AI Insight
             </div>
-            <p className="text-sm leading-relaxed italic">{summary}</p>
+            <p className="text-sm leading-relaxed italic text-gold/90 font-medium">"{summary}"</p>
             <button 
               onClick={() => setSummary(null)} 
-              className="absolute top-2 right-2 text-xs text-muted-foreground hover:text-foreground"
+              className="absolute top-4 right-4 text-[10px] text-gold/60 hover:text-gold font-bold uppercase tracking-wider"
             >
-              Show original
+              Close
             </button>
           </div>
         ) : (
@@ -101,39 +104,39 @@ export function PostCard({ author, content, image, timestamp, likes, comments, i
           <Button 
             variant="outline" 
             size="sm" 
-            className="h-7 text-[10px] border-primary/30 text-primary hover:bg-primary/10"
+            className="h-7 text-[10px] border-gold/20 text-gold hover:bg-gold/10 font-bold uppercase tracking-wider"
             onClick={handleSummarize}
             disabled={isSummarizing}
           >
-            <Sparkles className="w-3 h-3 mr-1" />
-            {isSummarizing ? "Summarizing..." : "Summarize with AI"}
+            <Sparkles className="w-3 h-3 mr-1.5" />
+            {isSummarizing ? "Analyzing..." : "AI Summary"}
           </Button>
         )}
 
         {image && (
-          <div className="rounded-xl overflow-hidden border border-border">
-            <img src={image} alt="Post media" className="w-full h-auto object-cover max-h-96" />
+          <div className="rounded-xl overflow-hidden border border-border/50 bg-navy/50">
+            <img src={image} alt="Post media" className="w-full h-auto object-cover max-h-[450px]" />
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-6 pt-2 border-t border-border">
+      <div className="flex items-center gap-6 pt-3 border-t border-border/50">
         <button 
           onClick={() => setLiked(!liked)}
           className={cn(
-            "flex items-center gap-2 text-xs transition-colors",
-            liked ? "text-destructive" : "text-muted-foreground hover:text-destructive"
+            "flex items-center gap-2 text-xs font-bold transition-all",
+            liked ? "text-red-500 scale-110" : "text-muted-foreground hover:text-red-500"
           )}
         >
           <Heart className={cn("w-5 h-5", liked && "fill-current")} />
           <span>{likes + (liked ? 1 : 0)}</span>
         </button>
-        <button className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors">
+        <button className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-gold transition-colors">
           <MessageCircle className="w-5 h-5" />
           <span>{comments}</span>
         </button>
-        <button className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors ml-auto">
-          <Share2 className="w-5 h-5" />
+        <button className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-gold transition-colors ml-auto group/share">
+          <Share2 className="w-5 h-5 group-hover/share:scale-110 transition-transform" />
         </button>
       </div>
     </div>
