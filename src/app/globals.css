@@ -5,47 +5,49 @@
 
 @layer base {
   :root {
-    --background: 45 30% 97%;
-    --foreground: 240 27% 8%;
-    --card: 45 20% 94%;
-    --card-foreground: 240 27% 8%;
-    --popover: 45 20% 94%;
-    --popover-foreground: 240 27% 8%;
-    --primary: 44 58% 54%;
-    --primary-foreground: 240 27% 8%;
-    --secondary: 225 10% 83%;
-    --secondary-foreground: 240 27% 8%;
-    --muted: 45 10% 90%;
-    --muted-foreground: 240 5% 45%;
+    /* Light Mode: Warm Ivory / Cloud */
+    --background: 40 30% 98%; /* #FAF8F3 */
+    --foreground: 240 27% 9%; /* #1A1A2E (Obsidian) */
+    --card: 40 20% 95%; /* #F3F1EB (Cloud) */
+    --card-foreground: 240 27% 9%;
+    --popover: 40 20% 92%; /* #E8E6E0 */
+    --popover-foreground: 240 27% 9%;
+    --primary: 44 58% 62%; /* #D4B86A (Bright Gold) */
+    --primary-foreground: 240 27% 9%;
+    --secondary: 228 18% 35%; /* #4A4A6A (Slate) */
+    --secondary-foreground: 40 30% 98%;
+    --muted: 40 10% 90%;
+    --muted-foreground: 228 10% 45%;
     --accent: 44 58% 62%;
-    --accent-foreground: 240 27% 8%;
+    --accent-foreground: 240 27% 9%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 10% 85%;
-    --input: 240 10% 85%;
-    --ring: 44 58% 54%;
+    --border: 40 10% 88%;
+    --input: 40 10% 88%;
+    --ring: 44 58% 62%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 240 27% 5%;
-    --foreground: 45 20% 96%;
-    --card: 240 27% 8%;
+    /* Dark Mode: Obsidian & Champagne */
+    --background: 240 27% 5%; /* #0F0F1A */
+    --foreground: 45 20% 96%; /* #F5F5F0 (Near White) */
+    --card: 240 27% 9%; /* #1A1A2E (Deep Navy) */
     --card-foreground: 45 20% 96%;
-    --popover: 240 27% 8%;
+    --popover: 240 15% 15%; /* #2C2C3E (Charcoal) */
     --popover-foreground: 45 20% 96%;
-    --primary: 44 58% 62%;
+    --primary: 44 58% 62%; /* #D4B86A (Bright Gold) */
     --primary-foreground: 240 27% 5%;
-    --secondary: 225 10% 83%;
+    --secondary: 225 6% 83%; /* #D0D2D8 (Platinum) */
     --secondary-foreground: 240 27% 5%;
-    --muted: 240 20% 15%;
-    --muted-foreground: 240 5% 70%;
-    --accent: 44 58% 62%;
-    --accent-foreground: 240 27% 5%;
+    --muted: 240 10% 15%;
+    --muted-foreground: 240 5% 45%; /* #6B7280 (Gray) */
+    --accent: 44 58% 20%; /* Muted Gold Tint */
+    --accent-foreground: 45 20% 96%;
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 20% 18%;
-    --input: 240 20% 18%;
+    --border: 240 10% 18%;
+    --input: 240 10% 18%;
     --ring: 44 58% 62%;
   }
 }
@@ -62,15 +64,33 @@
   }
 }
 
-.champagne-gradient {
-  background: linear-gradient(135deg, hsl(44 58% 62%), hsl(44 58% 45%));
+@layer components {
+  .champagne-gradient {
+    background: linear-gradient(135deg, #D4B86A, #B89B4D);
+  }
+
+  .obsidian-card {
+    @apply bg-card border-[0.5px] border-border hover:border-gold transition-all duration-150 rounded-xl overflow-hidden;
+  }
+
+  .dash-input {
+    @apply h-[44px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .dash-button-primary {
+    @apply h-[44px] rounded-md bg-gold text-obsidian font-bold text-sm px-4 py-2 hover:bg-gold/90 transition-colors disabled:opacity-50;
+  }
+
+  .dash-button-secondary {
+    @apply h-[44px] rounded-md border border-gold bg-transparent text-gold font-bold text-sm px-4 py-2 hover:bg-gold/10 transition-colors disabled:opacity-50;
+  }
+
+  .emergency-alert {
+    @apply border-l-[3px] border-emergency bg-emergency/10 text-emergency;
+  }
 }
 
-.obsidian-card {
-  @apply bg-card border-[0.5px] border-border hover:border-primary/50 transition-all duration-150 rounded-xl overflow-hidden;
-}
-
-/* Custom Scrollbar for Obsidian theme */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -79,4 +99,10 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-muted rounded-full hover:bg-muted-foreground/30 transition-colors;
+}
+
+.shimmer-bg {
+  background: linear-gradient(90deg, transparent, rgba(212, 184, 106, 0.1), transparent);
+  background-size: 1000px 100%;
+  @apply animate-shimmer;
 }
