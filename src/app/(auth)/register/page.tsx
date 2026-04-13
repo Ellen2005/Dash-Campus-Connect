@@ -63,25 +63,25 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-obsidian text-near-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#D4B86A22,transparent_60%)]" />
-      
-      <div className="relative w-full max-w-xl space-y-8 animate-in fade-in zoom-in-95 duration-500">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl champagne-gradient text-obsidian font-headline font-bold text-4xl shadow-xl mb-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background text-foreground relative overflow-hidden">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-none" />
+      <div className="absolute top-14 left-10 w-32 h-32 rounded-full bg-primary/15 blur-3xl animate-float" />
+      <div className="relative z-10 w-full max-w-xl space-y-8 animate-in fade-in zoom-in-95 duration-500">
+        <div className="text-center space-y-2 relative z-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground font-headline font-black text-4xl shadow-2xl shadow-primary/30 mb-4">
             D
           </div>
           <h1 className="text-3xl font-headline font-bold tracking-tight">Join Dash</h1>
-          <p className="text-muted-foreground">The exclusive layer for your university life.</p>
+          <p className="text-muted-foreground">The premium campus experience, built for students.</p>
         </div>
 
-        <div className="obsidian-card p-8 bg-navy/50 backdrop-blur-md border-white/5">
+        <div className="bg-card border border-border p-8 bg-card/90 backdrop-blur-xl shadow-xl rounded-2xl">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Full Name</Label>
                 <Input 
-                  className="dash-input bg-obsidian/40" 
+                  className="dash-input bg-background/40" 
                   placeholder="Alex Rivera"
                   required
                   value={formData.fullName}
@@ -91,7 +91,7 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Username</Label>
                 <Input 
-                  className="dash-input bg-obsidian/40" 
+                  className="dash-input bg-background/40" 
                   placeholder="arivera_comp"
                   required
                   value={formData.username}
@@ -105,7 +105,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Input 
                   type="email"
-                  className="dash-input bg-obsidian/40 pl-10" 
+                  className="dash-input bg-background/40 pl-10" 
                   placeholder="your.email@example.com"
                   required
                   value={formData.email}
@@ -120,7 +120,7 @@ export default function RegisterPage() {
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Password</Label>
                 <Input 
                   type="password"
-                  className="dash-input bg-obsidian/40" 
+                  className="dash-input bg-background/40" 
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
@@ -130,7 +130,7 @@ export default function RegisterPage() {
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Confirm Password</Label>
                 <Input 
                   type="password"
-                  className="dash-input bg-obsidian/40" 
+                  className="dash-input bg-background/40" 
                   required
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
@@ -142,10 +142,10 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Faculty</Label>
                 <Select onValueChange={(v) => setFormData({...formData, faculty: v})}>
-                  <SelectTrigger className="dash-input bg-obsidian/40">
+                  <SelectTrigger className="dash-input bg-background/40">
                     <SelectValue placeholder="Select Faculty" />
                   </SelectTrigger>
-                  <SelectContent className="bg-charcoal border-white/5">
+                  <SelectContent className="bg-card border-white/10">
                     <SelectItem value="eng">Engineering</SelectItem>
                     <SelectItem value="sci">Science</SelectItem>
                     <SelectItem value="art">Arts & Humanities</SelectItem>
@@ -157,10 +157,10 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Year of Study</Label>
                 <Select onValueChange={(v) => setFormData({...formData, year: v})}>
-                  <SelectTrigger className="dash-input bg-obsidian/40">
+                  <SelectTrigger className="dash-input bg-background/40">
                     <SelectValue placeholder="Year 1 - 7" />
                   </SelectTrigger>
-                  <SelectContent className="bg-charcoal border-white/5">
+                  <SelectContent className="bg-card border-white/10">
                     {[1, 2, 3, 4, 5, 6, 7].map(y => (
                       <SelectItem key={y} value={y.toString()}>Year {y}</SelectItem>
                     ))}
@@ -172,12 +172,12 @@ export default function RegisterPage() {
             <div className="flex items-start space-x-2 pt-2">
               <Checkbox 
                 id="terms" 
-                className="border-white/20 data-[state=checked]:bg-gold" 
+                className="border-border data-[state=checked]:bg-primary" 
                 checked={formData.agreed}
                 onCheckedChange={(checked) => setFormData({...formData, agreed: !!checked})}
               />
               <Label htmlFor="terms" className="text-xs text-muted-foreground leading-none">
-                I agree to the <Link href="#" className="text-gold hover:underline">Terms of Service</Link> and privacy policy.
+                I agree to the <Link href="#" className="text-primary hover:underline">Terms of Service</Link> and privacy policy.
               </Label>
             </div>
 
@@ -189,7 +189,7 @@ export default function RegisterPage() {
 
             <Button 
               type="submit" 
-              className="w-full h-11 champagne-gradient text-obsidian font-bold group"
+              className="w-full h-11 dash-button-primary group"
               disabled={isLoading || !formData.agreed}
             >
               {isLoading ? (
@@ -205,11 +205,11 @@ export default function RegisterPage() {
 
           <div className="flex flex-col items-center gap-4 pt-6 border-t border-white/5">
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider">
-              <ShieldCheck className="w-3 h-3 text-gold" />
+              <ShieldCheck className="w-3 h-3 text-primary" />
               Institutional Security Layer Active
             </div>
             <p className="text-xs">
-              Already have an account? <Link href="/login" className="text-gold font-bold hover:underline">Sign In</Link>
+              Already have an account? <Link href="/login" className="text-primary font-bold hover:underline">Sign In</Link>
             </p>
           </div>
         </div>

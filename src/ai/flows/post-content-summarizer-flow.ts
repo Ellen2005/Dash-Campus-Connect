@@ -7,8 +7,7 @@
  * - SummarizePostContentOutput - The return type for the summarizePostContent function.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const SummarizePostContentInputSchema = z.object({
   postContent: z.string().describe('The full text content of the post to be summarized.'),
@@ -21,31 +20,7 @@ const SummarizePostContentOutputSchema = z.object({
 export type SummarizePostContentOutput = z.infer<typeof SummarizePostContentOutputSchema>;
 
 export async function summarizePostContent(input: SummarizePostContentInput): Promise<SummarizePostContentOutput> {
-  return summarizePostContentFlow(input);
+  const { postContent } = SummarizePostContentInputSchema.parse(input);
+  const summary = postContent.length > 120 ? `${postContent.slice(0, 120).trim()}...` : postContent;
+  return { summary };
 }
-
-const summarizePostContentPrompt = ai.definePrompt({
-  name: 'summarizePostContentPrompt',
-  input: { schema: SummarizePostContentInputSchema },
-  output: { schema: SummarizePostContentOutputSchema },
-  prompt: `You are an AI assistant designed to provide concise summaries of social media posts.
-Your goal is to extract the main points and present them clearly and briefly.
-
-Summarize the following post content:
-
-Post Content: {{{postContent}}}
-
-Summary:`,
-});
-
-const summarizePostContentFlow = ai.defineFlow(
-  {
-    name: 'summarizePostContentFlow',
-    inputSchema: SummarizePostContentInputSchema,
-    outputSchema: SummarizePostContentOutputSchema,
-  },
-  async (input) => {
-    const { output } = await summarizePostContentPrompt(input);
-    return output!;
-  }
-);

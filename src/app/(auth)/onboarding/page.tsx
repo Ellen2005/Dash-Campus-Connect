@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Sparkles, Camera, ArrowRight, Bell, Moon, Sun, ShieldCheck } from "lucide-react";
+import { Loader2, Sparkles, Camera, ArrowRight, Bell, Moon, Sun, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function OnboardingPage() {

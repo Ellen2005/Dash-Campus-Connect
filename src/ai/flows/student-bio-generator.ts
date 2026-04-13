@@ -7,8 +7,7 @@
  * - StudentBioGeneratorOutput - The return type for the studentBioGenerator function.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const StudentBioGeneratorInputSchema = z.object({
   academicField: z
@@ -32,31 +31,8 @@ export type StudentBioGeneratorOutput = z.infer<
 export async function studentBioGenerator(
   input: StudentBioGeneratorInput
 ): Promise<StudentBioGeneratorOutput> {
-  return studentBioGeneratorFlow(input);
+  const { academicField, interests } = StudentBioGeneratorInputSchema.parse(input);
+  return {
+    bio: `A driven ${academicField} student who is passionate about ${interests} and ready to connect with campus life.`,
+  };
 }
-
-const prompt = ai.definePrompt({
-  name: 'studentBioGeneratorPrompt',
-  input: { schema: StudentBioGeneratorInputSchema },
-  output: { schema: StudentBioGeneratorOutputSchema },
-  prompt: `You are a helpful assistant that generates creative and engaging student bios for a campus connect platform.
-
-Based on the following information, craft a short and appealing bio for a university student's profile.
-
-Academic Field: {{{academicField}}}
-Interests: {{{interests}}}
-
-Ensure the bio is concise, positive, and highlights their unique personality and academic pursuits.`, 
-});
-
-const studentBioGeneratorFlow = ai.defineFlow(
-  {
-    name: 'studentBioGeneratorFlow',
-    inputSchema: StudentBioGeneratorInputSchema,
-    outputSchema: StudentBioGeneratorOutputSchema,
-  },
-  async (input) => {
-    const { output } = await prompt(input);
-    return output!;
-  }
-);

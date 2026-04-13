@@ -1,0 +1,479 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= User & Authentication =============
+model User {
+  id                    String          @id @default(cuid())
+  email                 String          @unique
+  password              String?         // Optional if using Supabase Auth
+  name                  String
+  username              String?         @unique
+  bio                   String?         @db.Text
+  profilePhoto          String?
+  coverPhoto            String?
+  major                 String?
+  year                  String?         // e.g., "2026", "Grad"
+  interests             String[]        @default([]) // Stored as JSONB
+  phone                 String?
+  secondaryEmail        String?
+  hometown              String?
+  
+  // Privacy settings
+  privacyPublic         Boolean         @default(true)
+  onlyFriendsCanSeePosts Boolean        @default(false)
+  hideFromMarketplace   Boolean         @default(false)
+  
+  // Roles
+  role                  Role            @default(USER)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  // Relations
+  posts                 Post[]
+  comments              Comment[]
+  likes                 Like[]
+  events                Event[]
+  eventAttendees        EventAttendee[]
+  listings              MarketplaceListing[]
+  reviews               Review[]
+  followers             Follow[]        @relation("follower")
+  following             Follow[]        @relation("following")
+  groupMemberships      GroupMember[]
+  messages              Message[]
+  mentionedIn           Mention[]
+  createdGroups         Group[]         @relation("groupCreator")
+
+  @@index([email])
+  @@index([username])
+  @@index([createdAt])
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ============= Social Features =============
+model Follow {
+  id          String   @id @default(cuid())
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followerId  String
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Post {
+  id          String     @id @default(cuid())
+  content     String     @db.Text
+  author      User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId    String
+  images      String[]   @default([]) // URLs
+  video       String?    // Single video URL
+  
+  // Poll support
+  isPoll      Boolean    @default(false)
+  pollOptions PollOption[]
+  
+  // Audience
+  audience    Audience   @default(EVERYONE)
+  audienceGroup   Group? @relation("audienceGroup", fields: [audienceGroupId], references: [id])
+  audienceGroupId String?
+  
+  // Group post
+  groupPost   Group?     @relation("groupPosts", fields: [groupPostId], references: [id], onDelete: SetNull)
+  groupPostId String?
+  
+  // Location
+  location    String?
+  
+  // Engagement
+  likes       Like[]
+  comments    Comment[]
+  shares      Int        @default(0)
+  saves       String[]   @default([]) // User IDs who saved
+  
+  // Moderation
+  isFlagged   Boolean    @default(false)
+  flags       ModeratorFlag[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([audience])
+}
+
+enum Audience {
+  EVERYONE
+  DEPARTMENT
+  FRIENDS_ONLY
+  SPECIFIC_GROUP
+}
+
+model PollOption {
+  id      String @id @default(cuid())
+  text    String
+  post    Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId  String
+  votes   String[] @default([]) // User IDs
+
+  @@index([postId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  reaction  String   @default("👍") // 👍 ❤️ 😂 😮 😢
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  content   String    @db.Text
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  
+  // Threaded comments
+  parentComment   Comment?  @relation("replies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  parentCommentId String?
+  replies         Comment[] @relation("replies")
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentCommentId])
+}
+
+model Mention {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  postId    String?
+  commentId String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ============= Groups & Communities =============
+model Group {
+  id          String        @id @default(cuid())
+  name        String
+  description String?       @db.Text
+  photo       String?
+  type        GroupType     @default(STUDENT_CREATED)
+  
+  // For auto-assigned groups
+  department  String?
+  year        String?
+  courseCode  String?
+  
+  creator     User?         @relation("groupCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  creatorId   String?
+  
+  members     GroupMember[]
+  posts       Post[]        @relation("groupPosts")
+  audiencePosts Post[]      @relation("audienceGroup")
+  events      Event[]
+  
+  isPublic    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([type])
+  @@index([department])
+  @@index([year])
+}
+
+enum GroupType {
+  AUTO_ASSIGNED_DEPARTMENT
+  AUTO_ASSIGNED_YEAR
+  OFFICIAL
+  STUDENT_CREATED
+  COURSE
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId   String
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+}
+
+enum GroupRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+// ============= Messaging & Chat =============
+model Message {
+  id          String      @id @default(cuid())
+  content     String      @db.Text
+  sender      User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId    String
+  
+  // For 1-on-1 chats
+  recipient   String?     // User ID
+  
+  // For group chats
+  chatGroup   ChatGroup?  @relation(fields: [chatGroupId], references: [id], onDelete: Cascade)
+  chatGroupId String?
+  
+  images      String[]    @default([])
+  voiceUrl    String?     // 2 min max
+  
+  isRead      Boolean     @default(false)
+  readAt      DateTime?
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([senderId])
+  @@index([chatGroupId])
+}
+
+model ChatGroup {
+  id        String    @id @default(cuid())
+  name      String?
+  photo     String?
+  members   String[]  @default([]) // User IDs
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+// ============= Events =============
+model Event {
+  id          String        @id @default(cuid())
+  title       String
+  description String?       @db.Text
+  date        DateTime
+  endDate     DateTime?
+  location    String
+  
+  // Map coordinates
+  latitude    Float?
+  longitude   Float?
+  
+  capacity    Int?
+  
+  organizer   User          @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  organizerId String
+  
+  group       Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  groupId     String?
+  
+  attendees   EventAttendee[]
+  
+  isRecurring Boolean       @default(false)
+  recurrencePattern String? // e.g., "WEEKLY"
+  
+  isFree      Boolean       @default(true)
+  ticketPrice Float?
+  
+  qrCheckIn   String?
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([organizerId])
+  @@index([date])
+}
+
+model EventAttendee {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  status    RSVPStatus @default(INTERESTED)
+  checkedIn Boolean  @default(false)
+  joinedAt  DateTime @default(now())
+
+  @@unique([userId, eventId])
+  @@index([eventId])
+}
+
+enum RSVPStatus {
+  INTERESTED
+  GOING
+  MAYBE
+  NOT_GOING
+}
+
+// ============= Marketplace =============
+model MarketplaceListing {
+  id          String      @id @default(cuid())
+  title       String
+  description String      @db.Text
+  seller      User        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerId    String
+  
+  category    MarketplaceCategory
+  condition   Condition
+  
+  price       Float?
+  isFree      Boolean     @default(false)
+  isTradeOnly Boolean     @default(false)
+  
+  images      String[]    @default([])
+  
+  preferredContact String? // "chat", "phone", "email"
+  
+  status      ListingStatus @default(ACTIVE)
+  expiresAt   DateTime?
+  
+  isFlagged   Boolean     @default(false)
+  flags       ModeratorFlag[]
+  
+  reviews     Review[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([sellerId])
+  @@index([category])
+  @@index([status])
+}
+
+enum MarketplaceCategory {
+  TEXTBOOKS
+  ELECTRONICS
+  FURNITURE
+  HOUSING
+  SERVICES
+  TICKETS
+  OTHER
+}
+
+enum Condition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  EXPIRED
+  REMOVED
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1-5
+  comment   String?  @db.Text
+  
+  reviewer  User     @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewerId String
+  
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String
+  
+  createdAt DateTime @default(now())
+
+  @@index([reviewerId])
+  @@index([listingId])
+}
+
+// ============= Moderation =============
+model ModeratorFlag {
+  id        String   @id @default(cuid())
+  reason    String
+  status    FlagStatus @default(PENDING)
+  
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String?
+  
+  listing   MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId String?
+  
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@index([listingId])
+  @@index([status])
+}
+
+enum FlagStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  DISMISSED
+}
+
+// ============= Notifications =============
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   // Cannot use relation to avoid circular deps
+  type      NotificationType
+  title     String
+  message   String   @db.Text
+  actionUrl String?
+  
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  COMMENT
+  LIKE
+  MENTION
+  EVENT_REMINDER
+  MESSAGE
+  MARKETPLACE_ALERT
+  SYSTEM_ALERT
+}
+
+// ============= Analytics & Logging =============
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  resource  String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

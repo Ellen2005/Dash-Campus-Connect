@@ -1,0 +1,193 @@
+"use client";
+
+import { cn } from "@/lib/utils";
+import {
+  Hash, Settings, Plus, Shield, Megaphone,
+  ShoppingBag, Home, Search, BookOpen, LifeBuoy, Users
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
+
+const communities = [
+  { id: "home", label: "CG",  href: "/main" },
+  { id: "cs",   label: "CS",  href: "/main" },
+  { id: "ws",   label: "WS",  href: "/main" },
+  { id: "26",   label: "'26", href: "/main" },
+];
+
+export function ServerSidebar() {
+  const pathname = usePathname();
+
+  return (
+    <div className="w-[64px] hidden md:flex flex-col items-center py-3 gap-1 sidebar-bg border-r h-full">
+      {/* Logo */}
+      <Link href="/main" className="group relative flex items-center justify-center mb-1">
+        <ActivePill show={pathname === "/main"} />
+        <div className={cn(
+          "w-11 h-11 rounded-2xl flex items-center justify-center font-headline font-black text-lg transition-all duration-200",
+          "bg-primary text-primary-foreground",
+          pathname === "/main" ? "rounded-xl shadow-[0_0_16px_hsl(var(--primary)/0.4)]" : "group-hover:rounded-xl"
+        )}>
+          D
+        </div>
+      </Link>
+
+      <div className="w-6 h-px bg-border my-1" />
+
+      {/* Communities */}
+      <div className="flex-1 flex flex-col items-center gap-1 w-full overflow-y-auto no-scrollbar">
+        {communities.map((c) => {
+          const isActive = pathname === "/main" && c.id === "home";
+          return (
+            <Link key={c.id} href={c.href} className="group relative flex items-center justify-center w-full">
+              <ActivePill show={isActive} />
+              <div className={cn(
+                "w-11 h-11 flex items-center justify-center font-bold text-xs transition-all duration-200",
+                isActive
+                  ? "rounded-xl bg-primary/15 text-primary border border-primary/30"
+                  : "rounded-2xl bg-secondary text-secondary-foreground group-hover:rounded-xl group-hover:bg-primary/10 group-hover:text-primary"
+              )}>
+                {c.label}
+              </div>
+            </Link>
+          );
+        })}
+
+        <button className="group relative flex items-center justify-center w-full mt-1" title="Create community">
+          <div className="w-11 h-11 rounded-2xl border border-dashed border-border flex items-center justify-center text-muted-foreground transition-all duration-200 group-hover:rounded-xl group-hover:border-primary/40 group-hover:text-primary group-hover:bg-primary/8">
+            <Plus className="w-4 h-4" />
+          </div>
+        </button>
+      </div>
+
+      <div className="w-6 h-px bg-border my-1" />
+
+      {/* Bottom actions */}
+      <div className="flex flex-col items-center gap-1">
+        <SidebarIconBtn href="/main/search"  icon={Search}   label="Search"   pathname={pathname} />
+        <SidebarIconBtn href="/main/groups"  icon={Users}    label="Groups"   pathname={pathname} />
+        <SidebarIconBtn href="/main/support" icon={LifeBuoy} label="Support"  pathname={pathname} />
+        <SidebarIconBtn href="/main/admin"   icon={Shield}   label="Admin"    pathname={pathname} danger />
+        <SidebarIconBtn href="/main/profile" icon={Settings} label="Settings" pathname={pathname} />
+      </div>
+    </div>
+  );
+}
+
+function ActivePill({ show }: { show: boolean }) {
+  return (
+    <div className={cn(
+      "absolute left-0 w-0.5 bg-primary rounded-r-full transition-all duration-200",
+      show ? "h-8" : "h-0"
+    )} />
+  );
+}
+
+function SidebarIconBtn({
+  href, icon: Icon, label, pathname, danger
+}: {
+  href: string; icon: React.ElementType; label: string; pathname: string; danger?: boolean;
+}) {
+  const isActive = pathname.startsWith(href);
+  return (
+    <Link href={href} title={label} className={cn(
+      "w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200",
+      isActive
+        ? danger
+          ? "rounded-xl bg-destructive/15 text-destructive border border-destructive/30"
+          : "rounded-xl bg-primary/15 text-primary border border-primary/30"
+        : danger
+          ? "text-muted-foreground hover:rounded-xl hover:bg-destructive/10 hover:text-destructive"
+          : "text-muted-foreground hover:rounded-xl hover:bg-primary/10 hover:text-primary"
+    )}>
+      <Icon className="w-[18px] h-[18px]" />
+    </Link>
+  );
+}
+
+export function ChannelSidebar() {
+  const pathname = usePathname();
+  const { t } = useI18n();
+
+  const categories = [
+    {
+      name: "CAMPUS",
+      channels: [
+        { name: t("feed"),        icon: Megaphone,   href: "/main",             badge: "3" },
+        { name: "general",        icon: Hash,        href: "/main" },
+        { name: t("events"),      icon: BookOpen,    href: "/main/events" },
+        { name: t("groups"),      icon: Users,       href: "/main/groups" },
+        { name: t("search"),      icon: Search,      href: "/main/search" },
+      ],
+    },
+    {
+      name: "COMMUNITY",
+      channels: [
+        { name: t("market"),      icon: ShoppingBag, href: "/main/marketplace" },
+        { name: "housing",        icon: Home,        href: "/main/marketplace" },
+        { name: "lost-found",     icon: Search,      href: "/main" },
+        { name: t("support"),     icon: LifeBuoy,    href: "/main/support" },
+      ],
+    },
+  ];
+
+  return (
+    <div className="w-56 flex flex-col h-full sidebar-bg">
+      <div className="h-12 px-4 border-b border-border flex items-center font-headline font-bold text-sm tracking-tight cursor-pointer hover:bg-muted/30 transition-colors shrink-0">
+        Campus Global
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-3 space-y-4 no-scrollbar">
+        {categories.map((cat) => (
+          <div key={cat.name} className="px-2">
+            <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.12em] px-2 mb-1">
+              {cat.name}
+            </p>
+            <div className="space-y-px">
+              {cat.channels.map((ch) => {
+                const Icon = ch.icon;
+                const isActive =
+                  (ch.href === "/main" && pathname === "/main" && ch.name !== t("groups") && ch.name !== t("search")) ||
+                  (ch.href !== "/main" && pathname.startsWith(ch.href));
+                return (
+                  <Link
+                    key={ch.name + ch.href}
+                    href={ch.href}
+                    className={cn(
+                      "flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-100 group",
+                      isActive
+                        ? "bg-primary/12 text-primary font-semibold"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    )}
+                  >
+                    <Icon className={cn("w-3.5 h-3.5 shrink-0", isActive ? "text-primary" : "opacity-50 group-hover:opacity-80")} />
+                    <span className="truncate flex-1 text-[13px]">{ch.name}</span>
+                    {ch.badge && (
+                      <span className="w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center shrink-0">
+                        {ch.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* User strip */}
+      <Link href="/main/profile" className="px-3 py-2.5 border-t border-border flex items-center gap-2.5 hover:bg-muted/30 transition-colors cursor-pointer group shrink-0">
+        <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-[11px] relative shrink-0">
+          AR
+          <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border-2 border-card" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-semibold truncate leading-none">Alex Rivera</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{t("online")}</p>
+        </div>
+        <Settings className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      </Link>
+    </div>
+  );
+}
