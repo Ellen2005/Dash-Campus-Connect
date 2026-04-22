@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
 
 const SummarizePostContentInputSchema = z.object({
   postContent: z.string().describe('The full text content of the post to be summarized.'),
@@ -21,6 +22,11 @@ export type SummarizePostContentOutput = z.infer<typeof SummarizePostContentOutp
 
 export async function summarizePostContent(input: SummarizePostContentInput): Promise<SummarizePostContentOutput> {
   const { postContent } = SummarizePostContentInputSchema.parse(input);
-  const summary = postContent.length > 120 ? `${postContent.slice(0, 120).trim()}...` : postContent;
-  return { summary };
+
+  const result = await ai.generate({
+    prompt: `Please summarize the following post content in 2-3 sentences:\n\n${postContent}`,
+    output: { schema: SummarizePostContentOutputSchema },
+  });
+
+  return { summary: result.output?.summary || postContent.slice(0, 120) };
 }

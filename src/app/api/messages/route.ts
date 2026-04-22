@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 const SendMessageSchema = z.object({
   senderId: z.string(),
-  recipientId: z.string().optional(),
+  recipient: z.string().optional(),
   chatGroupId: z.string().optional(),
   content: z.string().min(1).max(2000),
   images: z.array(z.string()).default([]),
@@ -136,25 +136,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { senderId, recipientId, chatGroupId, content, images, voiceUrl } = SendMessageSchema.parse(body)
+    const { senderId, recipient, chatGroupId, content, images, voiceUrl } = SendMessageSchema.parse(body)
 
-    // Validate that either recipientId or chatGroupId is provided
-    if (!recipientId && !chatGroupId) {
-      return NextResponse.json({ error: 'Either recipientId or chatGroupId must be provided' }, { status: 400 })
+    // Validate that either recipient or chatGroupId is provided
+    if (!recipient && !chatGroupId) {
+      return NextResponse.json({ error: 'Either recipient or chatGroupId must be provided' }, { status: 400 })
     }
 
-    if (recipientId && chatGroupId) {
-      return NextResponse.json({ error: 'Cannot specify both recipientId and chatGroupId' }, { status: 400 })
+    if (recipient && chatGroupId) {
+      return NextResponse.json({ error: 'Cannot specify both recipient and chatGroupId' }, { status: 400 })
     }
 
     // For direct messages, check if recipient exists
-    if (recipientId) {
-      const recipient = await prisma.user.findUnique({
-        where: { id: recipientId },
+    if (recipient) {
+      const recipientUser = await prisma.user.findUnique({
+        where: { id: recipient },
         select: { id: true },
       })
 
-      if (!recipient) {
+      if (!recipientUser) {
         return NextResponse.json({ error: 'Recipient not found' }, { status: 404 })
       }
     }
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     const message = await prisma.message.create({
       data: {
         senderId,
-        recipient: recipientId,
+        recipient,
         chatGroupId,
         content,
         images,

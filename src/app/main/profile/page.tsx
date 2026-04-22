@@ -104,7 +104,7 @@ export default function ProfilePage() {
               {[
                 { icon: BookOpen, text: faculty },
                 { icon: MapPin,   text: PROFILE.location },
-                { icon: Calendar, text: `Joined ${PROFILE.joined}` },
+                { icon: Calendar, text: `${t("joinedDate")} ${PROFILE.joined}` },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} className="flex items-center gap-2.5 text-xs text-muted-foreground">
                   <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -163,8 +163,8 @@ export default function ProfilePage() {
             <TabsContent value="saved" className="pt-5">
               <div className="text-center py-12 text-muted-foreground">
                 <Bookmark className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-medium">No saved posts yet</p>
-                <p className="text-xs mt-1">Posts you save will appear here</p>
+                <p className="text-sm font-medium">{t("noSavedPosts")}</p>
+                <p className="text-xs mt-1">{t("savedPostsHint")}</p>
               </div>
             </TabsContent>
 
@@ -204,8 +204,8 @@ export default function ProfilePage() {
                 <h3 className="text-sm font-semibold flex items-center gap-2"><Bell className="w-4 h-4 text-primary" />{t("notifications")}</h3>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium">Push Notifications</p>
-                    <p className="text-[11px] text-muted-foreground">Alerts for messages and campus news</p>
+                    <p className="text-sm font-medium">{t("pushNotifications")}</p>
+                    <p className="text-[11px] text-muted-foreground">{t("pushNotifDesc")}</p>
                   </div>
                   <Switch checked={notifs} onCheckedChange={setNotifs} />
                 </div>
@@ -216,8 +216,8 @@ export default function ProfilePage() {
                 <h3 className="text-sm font-semibold flex items-center gap-2"><Shield className="w-4 h-4 text-primary" />{t("privacy")}</h3>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium">Public Profile</p>
-                    <p className="text-[11px] text-muted-foreground">Anyone on campus can see your profile</p>
+                    <p className="text-sm font-medium">{t("publicProfile")}</p>
+                    <p className="text-[11px] text-muted-foreground">{t("publicProfileDesc")}</p>
                   </div>
                   <Switch defaultChecked />
                 </div>

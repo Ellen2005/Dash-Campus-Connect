@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
 
 const StudentBioGeneratorInputSchema = z.object({
   academicField: z
@@ -32,7 +33,15 @@ export async function studentBioGenerator(
   input: StudentBioGeneratorInput
 ): Promise<StudentBioGeneratorOutput> {
   const { academicField, interests } = StudentBioGeneratorInputSchema.parse(input);
-  return {
+
+  const prompt = `Create a creative and engaging student bio (max 150 characters) for someone studying ${academicField} with interests in: ${interests}. Make it fun, professional, and highlight their personality.`;
+
+  const result = await ai.generate({
+    prompt,
+    output: { schema: StudentBioGeneratorOutputSchema },
+  });
+
+  return result.output || {
     bio: `A driven ${academicField} student who is passionate about ${interests} and ready to connect with campus life.`,
   };
 }

@@ -47,7 +47,7 @@ export function CreateEventDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2 rounded-full champagne-gradient font-bold shadow-lg">
+        <Button size="sm" className="gap-2 dash-button-primary">
           <PlusCircle className="w-4 h-4" />
           Create Event
         </Button>
@@ -90,14 +90,14 @@ export function CreateEventDialog() {
                   <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Start Date</Label>
                   <div className="relative">
                     <Input type="date" className="bg-background/50 border-border pl-9" required />
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold" />
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Time</Label>
                   <div className="relative">
                     <Input type="time" className="bg-background/50 border-border pl-9" required />
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold" />
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                   </div>
                 </div>
               </div>
@@ -106,7 +106,7 @@ export function CreateEventDialog() {
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Location Name</Label>
                 <div className="relative">
                   <Input placeholder="e.g. Main Hall, Wing B" className="bg-background/50 border-border pl-9" required />
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold" />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                 </div>
               </div>
             </div>
@@ -124,7 +124,7 @@ export function CreateEventDialog() {
 
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Banner Image</Label>
-                <div className="border-2 border-dashed border-border rounded-xl aspect-[16/9] flex flex-col items-center justify-center gap-2 hover:border-gold/40 transition-colors cursor-pointer bg-muted/20">
+                <div className="border-2 border-dashed border-border rounded-xl aspect-[16/9] flex flex-col items-center justify-center gap-2 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
                   <ImageIcon className="w-8 h-8 text-muted-foreground" />
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Upload 16:9 Image</span>
                 </div>
@@ -141,7 +141,7 @@ export function CreateEventDialog() {
             <Button variant="ghost" type="button" onClick={() => setIsOpen(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" className="champagne-gradient font-bold px-8" disabled={isLoading}>
+            <Button type="submit" className="dash-button-primary px-8" disabled={isLoading}>
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
               Publish Event
             </Button>

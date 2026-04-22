@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
 
 const AdminAnnouncementAssistantInputSchema = z.object({
   draftMessage: z
@@ -30,17 +31,29 @@ export type AdminAnnouncementAssistantOutput = z.infer<typeof AdminAnnouncementA
 
 export async function adminAnnouncementAssistant(input: AdminAnnouncementAssistantInput): Promise<AdminAnnouncementAssistantOutput> {
   const parsed = AdminAnnouncementAssistantInputSchema.parse(input);
-  const suggestedTitle = parsed.draftMessage.slice(0, 48) || 'Campus Announcement';
-  const revisedMessage = parsed.draftMessage.trim();
-  const suggestedPriority = parsed.context?.toLowerCase().includes('emergency')
-    ? 'Emergency'
-    : parsed.draftMessage.toLowerCase().includes('urgent')
-    ? 'Urgent'
-    : 'Normal';
 
-  return {
-    suggestedTitle,
-    revisedMessage,
-    suggestedPriority,
+  const prompt = `You are an AI assistant helping create effective campus announcements. Given the following draft message${parsed.context ? ` and context: "${parsed.context}"` : ''}, please:
+
+1. Suggest a concise, impactful title (max 50 characters)
+2. Revise the message to be clear, concise, and professional
+3. Determine the priority level: Normal, Urgent, or Emergency
+
+Draft message: "${parsed.draftMessage}"
+
+Respond with the title, revised message, and priority.`;
+
+  const result = await ai.generate({
+    prompt,
+    output: { schema: AdminAnnouncementAssistantOutputSchema },
+  });
+
+  return result.output || {
+    suggestedTitle: parsed.draftMessage.slice(0, 48) || 'Campus Announcement',
+    revisedMessage: parsed.draftMessage.trim(),
+    suggestedPriority: parsed.context?.toLowerCase().includes('emergency')
+      ? 'Emergency'
+      : parsed.draftMessage.toLowerCase().includes('urgent')
+      ? 'Urgent'
+      : 'Normal',
   };
 }

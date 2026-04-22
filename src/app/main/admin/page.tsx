@@ -51,8 +51,8 @@ export default function AdminDashboard() {
             <TrendingUp className="w-4 h-4" />
             Analytics Export
           </Button>
-          <Link href="/admin/announcements">
-            <Button size="sm" className="gap-2 champagne-gradient font-bold">
+          <Link href="/main/admin/announcements">
+            <Button size="sm" className="gap-2 dash-button-primary font-bold">
               <Megaphone className="w-4 h-4" />
               New Broadcast
             </Button>
@@ -64,7 +64,7 @@ export default function AdminDashboard() {
         {stats.map((stat, i) => (
           <Card
             key={stat.label}
-            className="obsidian-card animate-in fade-in slide-in-from-bottom-4 duration-500"
+            className="dash-card-hover animate-in fade-in slide-in-from-bottom-4 duration-500"
             style={{ animationDelay: `${i * 80}ms` }}
           >
             <CardContent className="p-6">
@@ -84,7 +84,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 obsidian-card animate-in fade-in slide-in-from-left-4 duration-500 delay-200">
+        <Card className="lg:col-span-2 dash-card-hover animate-in fade-in slide-in-from-left-4 duration-500 delay-200">
           <CardHeader>
             <CardTitle className="text-lg">Recent Moderation Queue</CardTitle>
             <CardDescription>Items flagged by users or AI for review.</CardDescription>
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
         </Card>
 
         <div className="space-y-6">
-          <Card className="obsidian-card animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
+          <Card className="dash-card-hover animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
             <CardHeader>
               <CardTitle className="text-lg">System Status</CardTitle>
               <CardDescription>Real-time platform metrics</CardDescription>
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
                   <div key={metric.label} className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{metric.label}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold font-code">{metric.value}</span>
+                      <span className="text-xs font-bold font-mono">{metric.value}</span>
                       <div className={`w-2 h-2 rounded-full ${metric.status === 'good' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-primary'}`} />
                     </div>
                   </div>
@@ -177,7 +177,7 @@ export default function AdminDashboard() {
           </Card>
 
           {/* Keyword Filter Panel */}
-          <Card className="obsidian-card animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
+          <Card className="dash-card-hover animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Filter className="w-4 h-4 text-accent" />

@@ -8,17 +8,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { DashLogo } from "@/components/shared/dash-logo";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t } = useI18n();
 
   const mobileNav = [
-    { href: "/main",             icon: Home,        label: t("feed") },
-    { href: "/main/groups",      icon: Users,       label: t("groups") },
-    { href: "/main/marketplace", icon: ShoppingBag, label: t("market") },
-    { href: "/main/search",      icon: Search,      label: t("search") },
-    { href: "/main/profile",     icon: User,        label: t("profile") },
+    { href: "/main",              icon: Home,        label: t("feed") },
+    { href: "/main/groups",       icon: Users,       label: t("groups") },
+    { href: "/main/notifications",icon: Bell,        label: t("notifications") },
+    { href: "/main/search",       icon: Search,      label: t("search") },
+    { href: "/main/profile",      icon: User,        label: t("profile") },
   ];
 
   return (
@@ -36,9 +37,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 h-14 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center font-headline font-black text-primary-foreground text-sm">
-              D
-            </div>
+            <DashLogo size={28} />
             <span className="font-headline font-bold text-base tracking-tight">Dash</span>
           </div>
           <div className="flex items-center gap-1">

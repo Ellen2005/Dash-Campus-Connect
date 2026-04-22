@@ -13,6 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 import { ReportDialog } from "@/components/feed/report-dialog";
 import { ShareDialog } from "@/components/shared/share-dialog";
 import { cn } from "@/lib/utils";
@@ -78,12 +79,14 @@ export function PostCard({ id = "post", author, content, image, timestamp, score
         <div className="flex items-start justify-between gap-2">
           <div className="flex gap-2.5">
             <div className="relative shrink-0">
-              <Avatar className="w-9 h-9 border border-border">
-                <AvatarImage src={displayAuthor.avatar} />
-                <AvatarFallback className="bg-primary/15 text-primary text-xs font-bold">
-                  {displayAuthor.name[0]}
-                </AvatarFallback>
-              </Avatar>
+              <Link href={`/main/profile/${displayAuthor.username}`}>
+                <Avatar className="w-9 h-9 border border-border hover:opacity-80 transition-opacity cursor-pointer">
+                  <AvatarImage src={displayAuthor.avatar} />
+                  <AvatarFallback className="bg-primary/15 text-primary text-xs font-bold">
+                    {displayAuthor.name[0]}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
               {anon && (
                 <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-muted rounded-full flex items-center justify-center border border-border">
                   <EyeOff className="w-2 h-2 text-muted-foreground" />
@@ -92,7 +95,9 @@ export function PostCard({ id = "post", author, content, image, timestamp, score
             </div>
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-semibold text-sm leading-none">{displayAuthor.name}</span>
+                <Link href={`/main/profile/${displayAuthor.username}`} className="font-semibold text-sm leading-none hover:text-primary transition-colors">
+                  {displayAuthor.name}
+                </Link>
                 {author.isVerified && <span className="verified-badge">✓</span>}
                 {author.flair && (
                   <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[9px] font-bold uppercase tracking-wider">

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { MarketplaceCategory, Condition } from '@prisma/client'
 
 
 
@@ -26,8 +27,15 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Filters
-    const category = searchParams.get('category') as any
-    const condition = searchParams.get('condition') as any
+    const categoryParam = searchParams.get('category');
+    const category = categoryParam && ['TEXTBOOKS', 'ELECTRONICS', 'FURNITURE', 'HOUSING', 'SERVICES', 'TICKETS', 'OTHER'].includes(categoryParam)
+      ? categoryParam as MarketplaceCategory
+      : undefined;
+    
+    const conditionParam = searchParams.get('condition');
+    const condition = conditionParam && ['NEW', 'LIKE_NEW', 'GOOD', 'FAIR'].includes(conditionParam)
+      ? conditionParam as Condition
+      : undefined;
     const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : undefined
     const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : undefined
     const isFree = searchParams.get('isFree') === 'true'
@@ -41,12 +49,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Category filter
-    if (category && category !== 'ALL') {
+    if (category) {
       where.category = category
     }
 
     // Condition filter
-    if (condition && condition !== 'ALL') {
+    if (condition) {
       where.condition = condition
     }
 

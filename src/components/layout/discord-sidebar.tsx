@@ -3,11 +3,12 @@
 import { cn } from "@/lib/utils";
 import {
   Hash, Settings, Plus, Shield, Megaphone,
-  ShoppingBag, Home, Search, BookOpen, LifeBuoy, Users
+  ShoppingBag, Search, BookOpen, LifeBuoy, Users, Bell
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
+import { DashLogo } from "@/components/shared/dash-logo";
 
 const communities = [
   { id: "home", label: "CG",  href: "/main" },
@@ -25,11 +26,10 @@ export function ServerSidebar() {
       <Link href="/main" className="group relative flex items-center justify-center mb-1">
         <ActivePill show={pathname === "/main"} />
         <div className={cn(
-          "w-11 h-11 rounded-2xl flex items-center justify-center font-headline font-black text-lg transition-all duration-200",
-          "bg-primary text-primary-foreground",
-          pathname === "/main" ? "rounded-xl shadow-[0_0_16px_hsl(var(--primary)/0.4)]" : "group-hover:rounded-xl"
+          "transition-all duration-200",
+          pathname === "/main" ? "drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]" : "group-hover:drop-shadow-[0_0_6px_hsl(var(--primary)/0.3)]"
         )}>
-          D
+          <DashLogo size={44} />
         </div>
       </Link>
 
@@ -65,7 +65,8 @@ export function ServerSidebar() {
 
       {/* Bottom actions */}
       <div className="flex flex-col items-center gap-1">
-        <SidebarIconBtn href="/main/search"  icon={Search}   label="Search"   pathname={pathname} />
+        <SidebarIconBtn href="/main/notifications" icon={Bell}    label="Notifications" pathname={pathname} />
+        <SidebarIconBtn href="/main/search"        icon={Search}   label="Search"        pathname={pathname} />
         <SidebarIconBtn href="/main/groups"  icon={Users}    label="Groups"   pathname={pathname} />
         <SidebarIconBtn href="/main/support" icon={LifeBuoy} label="Support"  pathname={pathname} />
         <SidebarIconBtn href="/main/admin"   icon={Shield}   label="Admin"    pathname={pathname} danger />
@@ -125,8 +126,7 @@ export function ChannelSidebar() {
       name: "COMMUNITY",
       channels: [
         { name: t("market"),      icon: ShoppingBag, href: "/main/marketplace" },
-        { name: "housing",        icon: Home,        href: "/main/marketplace" },
-        { name: "lost-found",     icon: Search,      href: "/main" },
+        { name: t("lostFound"),   icon: Search,      href: "/main/lost-found" },
         { name: t("support"),     icon: LifeBuoy,    href: "/main/support" },
       ],
     },

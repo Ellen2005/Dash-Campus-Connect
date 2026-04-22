@@ -71,6 +71,16 @@ export default function MarketplacePage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [savedItems, setSavedItems] = useState<string[]>([]);
+
+  const toggleSave = (id: string) => {
+    setSavedItems(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+    toast({ title: savedItems.includes(id) ? "Removed from saved" : "Item saved!", description: savedItems.includes(id) ? "" : "Find it in your saved items." });
+  };
+
+  const handleMessage = (sellerName: string) => {
+    toast({ title: `Message sent to ${sellerName}`, description: "They'll be notified and can reply in your inbox." });
+  };
 
   const categories = [
     { value: "all", label: "All Items", icon: Package },
@@ -169,12 +179,12 @@ export default function MarketplacePage() {
           <h1 className="text-2xl font-headline font-bold">Campus Marketplace</h1>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 rounded-full champagne-gradient font-bold shadow-lg">
+              <Button className="dash-button-primary gap-2">
                 <Plus className="w-4 h-4" />
                 Sell Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="obsidian-card max-w-2xl overflow-y-auto max-h-[90vh]">
+            <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle className="text-xl font-headline font-bold">List Your Item</DialogTitle>
                 <DialogDescription>
@@ -195,7 +205,7 @@ export default function MarketplacePage() {
                         <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Price</Label>
                         <div className="relative">
                           <Input type="number" placeholder="0" className="bg-background/50 border-border pl-8" required />
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold" />
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -246,7 +256,7 @@ export default function MarketplacePage() {
 
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Photos</Label>
-                      <div className="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center gap-2 hover:border-gold/40 transition-colors cursor-pointer bg-muted/20">
+                      <div className="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center gap-2 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
                         <Package className="w-8 h-8 text-muted-foreground" />
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Upload Photos</span>
                         <span className="text-[9px] text-muted-foreground">Max 5 • JPG, PNG</span>
@@ -259,7 +269,7 @@ export default function MarketplacePage() {
                   <Button variant="ghost" type="button" onClick={() => setIsCreateDialogOpen(false)} disabled={isCreating}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="champagne-gradient font-bold px-8" disabled={isCreating}>
+                  <Button type="submit" className="dash-button-primary px-8" disabled={isCreating}>
                     {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
                     List Item
                   </Button>
@@ -319,7 +329,7 @@ export default function MarketplacePage() {
               <div className="space-y-1">
                 <h3 className="font-bold text-sm line-clamp-2">{listing.title}</h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-headline font-bold text-gold">
+                  <span className="text-lg font-headline font-bold text-primary">
                     {listing.currency} {listing.price}
                   </span>
                   <Badge variant="secondary" className="text-[10px]">
@@ -335,9 +345,7 @@ export default function MarketplacePage() {
                 </Avatar>
                 <span className="text-xs text-muted-foreground truncate">{listing.seller.name}</span>
                 {listing.seller.verified && (
-                  <div className="w-3 h-3 bg-royal rounded-full flex items-center justify-center">
-                    <span className="text-[8px] text-white font-bold">✓</span>
-                  </div>
+                  <span className="verified-badge text-[8px]">✓</span>
                 )}
               </div>
 
@@ -347,12 +355,17 @@ export default function MarketplacePage() {
               </div>
             </CardContent>
             <CardFooter className="p-4 pt-0 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 gap-1">
+              <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => handleMessage(listing.seller.name)}>
                 <MessageCircle className="w-3 h-3" />
                 Message
               </Button>
-              <Button variant="outline" size="sm" className="px-3">
-                <Heart className="w-4 h-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                className={`px-3 transition-colors ${savedItems.includes(listing.id) ? 'text-destructive border-destructive/30 bg-destructive/5' : ''}`}
+                onClick={() => toggleSave(listing.id)}
+              >
+                <Heart className={`w-4 h-4 ${savedItems.includes(listing.id) ? 'fill-destructive' : ''}`} />
               </Button>
             </CardFooter>
           </Card>

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import type { GroupType } from '@prisma/client'
 
 
 
@@ -24,7 +25,10 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Filters
-    const type = searchParams.get('type') as any
+    const typeParam = searchParams.get('type');
+    const type = typeParam && ['AUTO_ASSIGNED_DEPARTMENT', 'AUTO_ASSIGNED_YEAR', 'OFFICIAL', 'STUDENT_CREATED', 'COURSE'].includes(typeParam)
+      ? typeParam as GroupType
+      : undefined;
     const department = searchParams.get('department')
     const year = searchParams.get('year')
     const isPublic = searchParams.get('isPublic') === 'true' ? true : searchParams.get('isPublic') === 'false' ? false : undefined
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest) {
     let where: any = {}
 
     // Type filter
-    if (type && type !== 'ALL') {
+    if (type) {
       where.type = type
     }
 
