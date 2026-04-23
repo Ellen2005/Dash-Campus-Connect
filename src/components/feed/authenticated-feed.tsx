@@ -15,16 +15,18 @@ import Link from "next/link";
 
 const MOCK_STORIES: Story[] = [
   { id: "s1", user: "Football 🏈", avatar: "", isLive: true, items: [{ type: "text", text: "LIVE: Campus vs Tech — 2nd Half!", bg: "bg-gradient-to-br from-destructive/80 to-destructive/40" }] },
-  { id: "s2", user: "Hackathon",   avatar: "", items: [{ type: "image", src: "https://picsum.photos/seed/hack/400/700" }] },
+  { id: "s2", user: "Hackathon",   avatar: "", items: [{ type: "image", src: "https://picsum.photos/seed/hack/400/700" }, { type: "text", text: "48 hours of building! 🚀", bg: "bg-gradient-to-br from-primary/80 to-primary/40" }] },
   { id: "s3", user: "Cafe Deals",  avatar: "", items: [{ type: "text", text: "☕ 20% off all drinks today!", bg: "bg-gradient-to-br from-amber-600/80 to-amber-400/40" }] },
   { id: "s4", user: "Library",     avatar: "", items: [{ type: "image", src: "https://picsum.photos/seed/lib/400/700" }] },
 ];
 
+// Posts with distinct channels — "general" only shows general posts, not all
 const ALL_POSTS = [
   { id: "p1", author: { name: "Alex Rivera",   username: "arivera_comp",    avatar: "https://picsum.photos/seed/alex/100/100",   flair: "Engineering '26" }, content: "Just finished the distributed systems project! If anyone needs help with the Raft algorithm implementation, hit me up. #ComputerScience #Raft", image: "https://picsum.photos/seed/code/800/400", timestamp: "15m ago", score: 124, comments: 18, channel: "general" },
   { id: "p2", author: { name: "Campus Dining", username: "dine_dash",       avatar: "https://picsum.photos/seed/dine/100/100",   isVerified: true },          content: "Friday Special: Sushi Bar is back at the main cafeteria! Students get a 10% discount with their Dash profile QR code. 🍣✨", timestamp: "1h ago", score: 89, comments: 4, channel: "general" },
   { id: "p3", author: { name: "Jordan Lee",    username: "jlee_arts",       avatar: "https://picsum.photos/seed/jordan/100/100", flair: "Arts '25" },          content: "Lost my blue North Face jacket near the library yesterday evening. Has my student ID inside. Please DM if found! 🙏", timestamp: "3h ago", score: 34, comments: 7, channel: "lost-and-found" },
   { id: "p4", author: { name: "Study Squad",   username: "study_squad_eng", avatar: "https://picsum.photos/seed/squad/100/100", flair: "Study Group" },        content: "Looking for 2 more people to join our Algorithms study group! We meet every Tuesday at 6pm in the library. DM to join. 📚", timestamp: "5h ago", score: 56, comments: 11, channel: "course-reviews" },
+  { id: "p5", author: { name: "Housing Board", username: "housing_board",   avatar: "https://picsum.photos/seed/house/100/100", isVerified: true },             content: "Room available near campus — 2-bedroom apartment, 5 min walk. Utilities included. DM for details. 🏠", timestamp: "6h ago", score: 28, comments: 5, channel: "housing" },
 ];
 
 const ANNOUNCEMENTS = [{
@@ -34,6 +36,7 @@ const ANNOUNCEMENTS = [{
   timestamp: "2h ago", score: 45, comments: 12, isAnnouncement: true,
 }];
 
+// "all" shows everything, each channel shows only its posts
 const CHANNELS = ["all", "general", "lost-and-found", "course-reviews", "housing"];
 
 export function AuthenticatedFeed() {
@@ -43,19 +46,22 @@ export function AuthenticatedFeed() {
   const [storyIdx, setStoryIdx] = useState(0);
   const [addStoryOpen, setAddStoryOpen] = useState(false);
 
-  const posts = activeChannel === "all" ? ALL_POSTS : ALL_POSTS.filter(p => p.channel === activeChannel);
+  // "all" = every post, specific channel = only that channel's posts
+  const posts = activeChannel === "all"
+    ? ALL_POSTS
+    : ALL_POSTS.filter(p => p.channel === activeChannel);
 
   return (
     <div className="space-y-5 page-enter">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-headline font-bold">{t("campusFeed")}</h1>
         <div className="flex items-center gap-2">
-          <button className="relative w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150">
-            <Link href="/main/notifications">
+          <Link href="/main/notifications">
+            <button className="relative w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-destructive" />
-            </Link>
-          </button>
+            </button>
+          </Link>
           <CreatePostDialog />
         </div>
       </div>
@@ -80,6 +86,7 @@ export function AuthenticatedFeed() {
         </div>
       </Tabs>
 
+      {/* Channel filter pills — "all" shows everything, "general" shows only general posts */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
         {CHANNELS.map(ch => (
           <button key={ch} onClick={() => setActiveChannel(ch)}
@@ -91,6 +98,7 @@ export function AuthenticatedFeed() {
         ))}
       </div>
 
+      {/* Stories */}
       <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 border-b border-border/50">
         <button onClick={() => setAddStoryOpen(true)} className="flex flex-col items-center gap-1 min-w-[60px] group">
           <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center bg-muted/20 hover:border-primary/40 transition-colors">
@@ -114,6 +122,7 @@ export function AuthenticatedFeed() {
         ))}
       </div>
 
+      {/* Announcements */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
           <Megaphone className="w-3 h-3 text-primary" /> {t("officialAnnouncements")}
@@ -125,8 +134,14 @@ export function AuthenticatedFeed() {
         ))}
       </div>
 
+      {/* Feed posts */}
       <div className="space-y-4 pb-16">
-        {posts.map((p, i) => (
+        {posts.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p className="text-sm">No posts in #{activeChannel} yet.</p>
+            <p className="text-xs mt-1">Be the first to post here!</p>
+          </div>
+        ) : posts.map((p, i) => (
           <div key={p.id} className="animate-in fade-in duration-200" style={{ animationDelay: `${i * 50}ms` }}>
             <PostCard {...p} />
           </div>

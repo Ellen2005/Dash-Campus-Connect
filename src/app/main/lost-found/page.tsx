@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, MapPin, Clock, Package, CheckCircle2, Loader2, MessageCircle, Send } from "lucide-react";
+import { Search, Plus, MapPin, Clock, Package, CheckCircle2, Loader2, MessageCircle, Send, ImageIcon, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,8 @@ export default function LostFoundPage() {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [form, setForm] = useState({ type: "lost", title: "", desc: "", location: "", category: "Other" });
   const [items, setItems] = useState(mockItems);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const filtered = items.filter(i =>
     i.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -54,11 +56,13 @@ export default function LostFoundPage() {
       setItems(prev => [{
         id: String(Date.now()), type: form.type, title: form.title, desc: form.desc,
         location: form.location, date: "Just now", category: form.category, resolved: false,
-        poster: "You", avatar: `https://picsum.photos/seed/${Date.now()}/80/80`
+        poster: "You", avatar: imagePreview ?? `https://picsum.photos/seed/${Date.now()}/80/80`
       }, ...prev]);
       setCreating(false);
       setCreateOpen(false);
       setForm({ type: "lost", title: "", desc: "", location: "", category: "Other" });
+      setImagePreview(null);
+      if (fileRef.current) fileRef.current.value = "";
       toast({
         title: form.type === "lost" ? t("lostReported") : t("foundPosted"),
         description: t("studentsNotified"),
@@ -212,6 +216,43 @@ export default function LostFoundPage() {
               <Textarea value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
                 placeholder={t("itemDescPlaceholder")} className="min-h-[80px] resize-none text-sm bg-muted/30" required />
             </div>
+
+            {/* Image upload */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Photo (Optional)</Label>
+              {imagePreview ? (
+                <div className="relative rounded-xl overflow-hidden border border-border">
+                  <img src={imagePreview} alt="Item" className="w-full h-32 object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImagePreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="w-full h-20 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1.5 hover:border-primary/40 hover:bg-primary/5 transition-all"
+                >
+                  <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground font-medium">Upload a photo of the item</span>
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) setImagePreview(URL.createObjectURL(file));
+                }}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("location")}</Label>

@@ -8,9 +8,6 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
   experimental: {
-    // Use worker_threads instead of child_process workers.
-    // This keeps `next build` working in environments where spawning child
-    // processes is blocked (e.g. "spawn EPERM").
     workerThreads: true,
     optimizePackageImports: [
       'lucide-react',
@@ -39,7 +36,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'picsum.photos' },
       { protocol: 'https', hostname: 'placehold.co' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: 'xdldorgfpxnbqkkdxhxb.supabase.co' },
     ],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 3600,
   },
 };
 

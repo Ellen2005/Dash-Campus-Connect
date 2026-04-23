@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Image as ImageIcon, X, Globe, Users, Lock, Sparkles, Loader2, Hash } from "lucide-react";
+import { PlusCircle, Image as ImageIcon, X, Globe, Users, Lock, Sparkles, Loader2, Hash, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
+import { uploadFile } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 
 const CHANNELS = ["general", "lost-and-found", "course-reviews", "housing", "marketplace"];
@@ -16,33 +18,82 @@ const CHANNELS = ["general", "lost-and-found", "course-reviews", "housing", "mar
 export function CreatePostDialog() {
   const { toast } = useToast();
   const { t } = useI18n();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState("");
   const [audience, setAudience] = useState("everyone");
   const [channel, setChannel] = useState("general");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setImagePreview(URL.createObjectURL(file));
+    if (!file) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm"];
+    if (!allowed.includes(file.type)) {
+      setUploadError("Only images (JPG, PNG, WebP, GIF) and videos (MP4, WebM) are allowed.");
+      return;
+    }
+    if (file.size > maxSize && file.type.startsWith("image/")) {
+      setUploadError("Image must be under 5MB.");
+      return;
+    }
+    setUploadError(null);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      let imageUrl: string | null = null;
+
+      if (imageFile && user) {
+        const { url, error } = await uploadFile(imageFile, "posts", user.id);
+        if (error) {
+          toast({ title: "Upload failed", description: error, variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+        imageUrl = url;
+      }
+
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          authorId: user?.id ?? "mock-user",
+          images: imageUrl ? [imageUrl] : [],
+          audience: audience === "everyone" ? "EVERYONE" : audience === "department" ? "DEPARTMENT" : "FRIENDS_ONLY",
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to create post");
+      }
+
       setLoading(false);
       setOpen(false);
-      setContent(""); setImagePreview(null); setAudience("everyone"); setChannel("general");
-      toast({ title: "Post Created", description: "Your post has been published to the campus feed." });
-    }, 1200);
+      setContent(""); setImagePreview(null); setImageFile(null); setAudience("everyone"); setChannel("general");
+      toast({ title: "Post Created ✅", description: "Your post has been published to the campus feed." });
+    } catch (err: any) {
+      toast({ title: "Failed to post", description: err.message ?? "Please try again.", variant: "destructive" });
+      setLoading(false);
+    }
   };
 
   const handleClose = (v: boolean) => {
-    if (!loading) { setOpen(v); if (!v) { setContent(""); setImagePreview(null); } }
+    if (!loading) { setOpen(v); if (!v) { setContent(""); setImagePreview(null); setImageFile(null); setUploadError(null); } }
   };
 
   return (
@@ -59,10 +110,11 @@ export function CreatePostDialog() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Author row */}
             <div className="flex items-center gap-2.5">
               <Avatar className="w-9 h-9 shrink-0">
-                <AvatarFallback className="bg-primary/15 text-primary text-sm font-bold">AR</AvatarFallback>
+                <AvatarFallback className="bg-primary/15 text-primary text-sm font-bold">
+                  {user?.user_metadata?.full_name?.[0] ?? "U"}
+                </AvatarFallback>
               </Avatar>
               <div className="flex gap-2 flex-wrap">
                 <Select value={audience} onValueChange={setAudience}>
@@ -86,7 +138,6 @@ export function CreatePostDialog() {
               </div>
             </div>
 
-            {/* Text area */}
             <Textarea
               autoFocus
               value={content}
@@ -97,16 +148,21 @@ export function CreatePostDialog() {
             />
             <div className="flex justify-between text-[10px] text-muted-foreground -mt-2">
               <span>{content.length}/5000 {t("characters")}</span>
-              <span className="text-primary font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> AI suggestions available</span>
+              <span className="text-primary font-medium flex items-center gap-1"><Sparkles className="w-3 h-3" /> {t("aiSuggestionsAvailable")}</span>
             </div>
 
-            {/* Image preview */}
+            {uploadError && (
+              <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/5 border border-destructive/15 rounded-lg px-3 py-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {uploadError}
+              </div>
+            )}
+
             {imagePreview && (
               <div className="relative rounded-lg overflow-hidden border border-border">
                 <img src={imagePreview} alt="Preview" className="w-full max-h-48 object-cover" />
                 <button
                   type="button"
-                  onClick={() => { setImagePreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+                  onClick={() => { setImagePreview(null); setImageFile(null); setUploadError(null); if (fileRef.current) fileRef.current.value = ""; }}
                   className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -114,7 +170,6 @@ export function CreatePostDialog() {
               </div>
             )}
 
-            {/* Toolbar */}
             <div className="flex items-center gap-2 pt-1 border-t border-border">
               <button
                 type="button"

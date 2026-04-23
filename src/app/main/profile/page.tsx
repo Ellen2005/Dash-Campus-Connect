@@ -14,6 +14,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ConnectionsDialog } from "@/components/shared/connections-dialog";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 import {
   Sparkles, Edit3, MapPin, Calendar, BookOpen, UserPlus,
   Grid, Image as ImageIcon, Bookmark, Settings, Bell, Shield,
@@ -37,6 +39,8 @@ const PROFILE = {
 export default function ProfilePage() {
   const { t, lang, setLang } = useI18n();
   const { toast } = useToast();
+  const { signOut, user } = useAuth();
+  const router = useRouter();
   const [bio, setBio] = useState(PROFILE.bio);
   const [faculty, setFaculty] = useState(PROFILE.faculty);
   const [interests, setInterests] = useState("AI, Coding, Hiking, Chess");
@@ -221,6 +225,18 @@ export default function ProfilePage() {
                   </div>
                   <Switch defaultChecked />
                 </div>
+              </div>
+              {/* Danger Zone */}
+              <div className="dash-card p-4 space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2 text-destructive"><Shield className="w-4 h-4" />{t("dangerZone")}</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 h-9"
+                  onClick={async () => { await signOut(); router.push("/"); }}
+                >
+                  Sign Out
+                </Button>
               </div>
             </TabsContent>
           </Tabs>

@@ -4,6 +4,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n";
+import { AuthProvider } from "@/lib/auth-context";
+import { ErrorBoundaryWrapper } from "@/components/shared/error-boundary";
 
 export const metadata: Metadata = {
   title: 'Dash — Campus Connect',
@@ -29,10 +31,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           enableSystem={false}
           disableTransitionOnChange={false}
         >
-          <I18nProvider>
-            {children}
-            <Toaster />
-          </I18nProvider>
+          <AuthProvider>
+            <I18nProvider>
+              <ErrorBoundaryWrapper>
+                {children}
+              </ErrorBoundaryWrapper>
+              <Toaster />
+            </I18nProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

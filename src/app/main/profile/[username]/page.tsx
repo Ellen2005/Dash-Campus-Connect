@@ -4,8 +4,13 @@ import { use, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { PostCard } from "@/components/feed/post-card";
-import { ArrowLeft, MapPin, Calendar, BookOpen, UserPlus, UserCheck, MessageCircle, Grid, ImageIcon } from "lucide-react";
+import {
+  ArrowLeft, MapPin, Calendar, BookOpen, UserPlus, UserCheck,
+  MessageCircle, Grid, ImageIcon, Send, Loader2
+} from "lucide-react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +55,8 @@ const MOCK_USERS: Record<string, {
 };
 
 const DEFAULT_USER = {
-  name: "Campus Student", username: "student", avatar: "https://picsum.photos/seed/default/200/200",
+  name: "Campus Student", username: "student",
+  avatar: "https://picsum.photos/seed/default/200/200",
   cover: "https://picsum.photos/seed/defaultcover/1200/400",
   bio: "A student at this campus.", faculty: "Unknown", location: "Campus",
   joined: "2024", followers: 0, following: 0,
@@ -61,11 +67,30 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
   const { t } = useI18n();
   const { toast } = useToast();
   const user = MOCK_USERS[username] ?? { ...DEFAULT_USER, username };
+
   const [following, setFollowing] = useState(false);
+  const [msgOpen, setMsgOpen] = useState(false);
+  const [msgText, setMsgText] = useState("");
+  const [sending, setSending] = useState(false);
 
   const handleFollow = () => {
     setFollowing(f => !f);
-    toast({ title: following ? "Unfollowed" : `Following ${user.name}` });
+    toast({ title: following ? `Unfollowed ${user.name}` : `Following ${user.name} 👋` });
+  };
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!msgText.trim()) return;
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      setMsgOpen(false);
+      setMsgText("");
+      toast({
+        title: `Message sent to ${user.name} ✅`,
+        description: "They'll be notified and can reply in your inbox.",
+      });
+    }, 900);
   };
 
   return (
@@ -76,6 +101,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
         </Button>
       </Link>
 
+      {/* Cover + Avatar */}
       <div className="relative mb-16">
         <div className="h-40 w-full rounded-xl border border-border overflow-hidden bg-muted">
           <img src={user.cover} alt="Cover" className="w-full h-full object-cover opacity-70" loading="lazy" />
@@ -97,20 +123,33 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
           </div>
         </div>
         <div className="absolute -bottom-10 right-5 flex gap-2">
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+          {/* Working Message button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => setMsgOpen(true)}
+          >
             <MessageCircle className="w-3.5 h-3.5" /> {t("message")}
           </Button>
           <Button
             size="sm"
-            className={following ? "h-8 text-xs gap-1.5 border border-primary/40 text-primary bg-transparent hover:bg-primary/10" : "dash-button-primary h-8 text-xs gap-1.5"}
+            className={following
+              ? "h-8 text-xs gap-1.5 border border-primary/40 text-primary bg-transparent hover:bg-primary/10"
+              : "dash-button-primary h-8 text-xs gap-1.5"
+            }
             onClick={handleFollow}
           >
-            {following ? <><UserCheck className="w-3.5 h-3.5" /> {t("following2")}</> : <><UserPlus className="w-3.5 h-3.5" /> {t("sendRequest")}</>}
+            {following
+              ? <><UserCheck className="w-3.5 h-3.5" /> {t("following2")}</>
+              : <><UserPlus className="w-3.5 h-3.5" /> {t("sendRequest")}</>
+            }
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* About */}
         <div className="space-y-4">
           <div className="dash-card p-4 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("about")}</h3>
@@ -140,6 +179,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
           </div>
         </div>
 
+        {/* Posts + Media */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="posts">
             <TabsList className="bg-transparent h-auto p-0 gap-6 border-b w-full justify-start rounded-none">
@@ -171,6 +211,52 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
           </Tabs>
         </div>
       </div>
+
+      {/* Message Dialog */}
+      <Dialog open={msgOpen} onOpenChange={open => { setMsgOpen(open); if (!open) setMsgText(""); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-primary" />
+              Message {user.name}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSendMessage} className="space-y-4 pt-1">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border">
+              <Avatar className="w-9 h-9 shrink-0">
+                <AvatarImage src={user.avatar} />
+                <AvatarFallback className="bg-primary/15 text-primary text-sm">{user.name[0]}</AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm font-semibold">{user.name}</p>
+                <p className="text-[11px] text-muted-foreground">@{user.username}</p>
+              </div>
+            </div>
+            <Textarea
+              autoFocus
+              value={msgText}
+              onChange={e => setMsgText(e.target.value)}
+              placeholder={`Write a message to ${user.name}…`}
+              className="min-h-[100px] resize-none text-sm bg-muted/30"
+              maxLength={500}
+              required
+            />
+            <p className="text-[10px] text-muted-foreground text-right -mt-2">{msgText.length}/500</p>
+            <DialogFooter>
+              <Button variant="ghost" size="sm" type="button" onClick={() => setMsgOpen(false)}>
+                {t("cancel")}
+              </Button>
+              <Button type="submit" size="sm" className="dash-button-primary h-8 px-4 text-xs" disabled={sending || !msgText.trim()}>
+                {sending
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                  : <Send className="w-3.5 h-3.5 mr-1.5" />
+                }
+                Send Message
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

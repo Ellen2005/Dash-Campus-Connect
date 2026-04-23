@@ -2,82 +2,109 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowRight, ShieldCheck, Loader2, Mail, User, Lock, GraduationCap, CheckCircle2 } from "lucide-react";
+import { ArrowRight, ShieldCheck, Loader2, User, Lock, Hash, GraduationCap, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DashLogo } from "@/components/shared/dash-logo";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
 
-const MOCK_SCHOOLS = [
-  { id: "uyd", name: "University of Yaoundé I", domain: "uy1.cm" },
-  { id: "ubuea", name: "University of Buea", domain: "ubuea.cm" },
-  { id: "demo", name: "Demo University", domain: "demo.edu" },
+const SCHOOLS = [
+  { id: "uyd",   name: "University of Yaoundé I",  code: "UYD" },
+  { id: "ubuea", name: "University of Buea",        code: "UBa" },
+  { id: "demo",  name: "Demo University",           code: "DEMO" },
 ];
 
-function isInstitutionalEmail(email: string): boolean {
-  const domain = email.split("@")[1]?.toLowerCase() ?? "";
-  if (!domain) return false;
-  if (domain.endsWith("gmail.com") || domain.endsWith("yahoo.com") || domain.endsWith("hotmail.com") || domain.endsWith("outlook.com")) return false;
-  return true;
+const FACULTIES = [
+  "Engineering", "Science", "Arts & Humanities",
+  "Business", "Medicine", "Law", "Education",
+];
+
+function validateStudentId(id: string): string | null {
+  if (!id.trim()) return "Student ID is required.";
+  if (id.trim().length < 4) return "Student ID must be at least 4 characters.";
+  if (!/^[A-Z0-9\-_/]+$/i.test(id.trim())) return "Student ID can only contain letters, numbers, hyphens and underscores.";
+  return null;
 }
 
-function matchesSchoolDomain(email: string, schoolDomain: string): boolean {
-  const domain = email.split("@")[1]?.toLowerCase() ?? "";
-  return domain === schoolDomain.toLowerCase();
+function validatePassword(pw: string, confirm: string): string | null {
+  if (pw.length < 6) return "Password must be at least 6 characters.";
+  if (pw !== confirm) return "Passwords do not match.";
+  return null;
 }
 
 export default function RegisterPage() {
-  const router = useRouter();
   const { toast } = useToast();
   const { t } = useI18n();
-  const [step, setStep] = useState<"form" | "verify" | "pending">("form");
-  const [isLoading, setIsLoading] = useState(false);
+  const { signUp } = useAuth();
+
+  const [step, setStep] = useState<"form" | "pending">("form");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [verifyCode, setVerifyCode] = useState("");
+  const [showPw, setShowPw] = useState(false);
 
   const [form, setForm] = useState({
-    schoolId: "", fullName: "", username: "", email: "",
-    password: "", confirmPassword: "", faculty: "", year: "", agreed: false,
+    schoolId: "",
+    studentId: "",
+    fullName: "",
+    username: "",
+    password: "",
+    confirmPassword: "",
+    faculty: "",
+    year: "",
+    agreed: false,
   });
 
-  const selectedSchool = MOCK_SCHOOLS.find(s => s.id === form.schoolId);
+  const set = (key: keyof typeof form) => (val: string | boolean) =>
+    setForm(f => ({ ...f, [key]: val }));
 
-  const validateEmail = () => {
-    if (!form.email.includes("@")) return "Please enter a valid email address.";
-    if (!isInstitutionalEmail(form.email)) return t("wrongDomain");
-    if (selectedSchool && !matchesSchoolDomain(form.email, selectedSchool.domain))
-      return `Please use your ${selectedSchool.name} email (@${selectedSchool.domain})`;
-    return "";
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const emailErr = validateEmail();
-    if (emailErr) { setError(emailErr); return; }
-    if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
-    if (form.username.length < 3) { setError("Username must be at least 3 characters."); return; }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setStep("verify");
-    }, 1200);
-  };
 
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (verifyCode.length < 4) { setError("Please enter the verification code."); return; }
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    if (!form.schoolId)          { setError("Please select your school."); return; }
+    const idErr = validateStudentId(form.studentId);
+    if (idErr)                   { setError(idErr); return; }
+    if (form.fullName.trim().length < 2) { setError("Please enter your full name."); return; }
+    if (form.username.trim().length < 3) { setError("Username must be at least 3 characters."); return; }
+    const pwErr = validatePassword(form.password, form.confirmPassword);
+    if (pwErr)                   { setError(pwErr); return; }
+    if (!form.faculty)           { setError("Please select your faculty."); return; }
+    if (!form.year)              { setError("Please select your year of study."); return; }
+
+    setLoading(true);
+    try {
+      const { error: authError } = await signUp({
+        studentId:  form.studentId.trim().toUpperCase(),
+        schoolId:   form.schoolId,
+        password:   form.password,
+        fullName:   form.fullName.trim(),
+        username:   form.username.trim().toLowerCase().replace(/\s/g, "_"),
+        faculty:    form.faculty,
+        year:       form.year,
+      });
+
+      if (authError) {
+        if (authError.includes("already registered") || authError.includes("already exists")) {
+          setError("This Student ID is already registered. Try signing in instead.");
+        } else {
+          setError(authError);
+        }
+        setLoading(false);
+        return;
+      }
+
+      setLoading(false);
       setStep("pending");
-    }, 1000);
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+      setLoading(false);
+    }
   };
 
   if (step === "pending") {
@@ -85,62 +112,49 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-background text-foreground">
         <div className="w-full max-w-md text-center space-y-6 animate-fade-up">
           <div className="flex justify-center"><DashLogo size={56} /></div>
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto animate-bounce-in">
             <CheckCircle2 className="w-8 h-8 text-primary" />
           </div>
+
           <div className="space-y-2">
             <h1 className="text-2xl font-headline font-bold">{t("awaitingApproval")}</h1>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">{t("approvalPending")}</p>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              {t("approvalPending")}
+            </p>
           </div>
-          <div className="dash-card p-4 text-left space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">What happens next?</p>
+
+          <div className="dash-card p-5 text-left space-y-3">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+              {t("whatHappensNext")}
+            </p>
             {[
-              "Your school admin reviews your registration",
-              "You'll receive an email once approved",
-              "Sign in and complete your profile",
-            ].map((step, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-sm">
-                <div className="w-5 h-5 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{i + 1}</div>
-                <span className="text-muted-foreground">{step}</span>
+              t("step1Approval"),
+              "You will be notified inside the app once approved",
+              t("step3Profile"),
+            ].map((text, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">
+                  {i + 1}
+                </div>
+                <span className="text-sm text-muted-foreground">{text}</span>
               </div>
             ))}
           </div>
-          <Link href="/login">
-            <Button variant="outline" className="w-full">{t("signIn")}</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
-  if (step === "verify") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background text-foreground">
-        <div className="w-full max-w-sm space-y-6 animate-fade-up">
-          <div className="text-center space-y-2">
-            <div className="flex justify-center mb-3"><DashLogo size={48} /></div>
-            <h1 className="text-2xl font-headline font-bold">{t("verifyEmail")}</h1>
-            <p className="text-sm text-muted-foreground">We sent a 6-digit code to <span className="font-semibold text-foreground">{form.email}</span></p>
+          <div className="dash-card p-4 flex items-start gap-3 text-left">
+            <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold">No email needed</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your account is identified by your Student ID. No email address required — ever.
+              </p>
+            </div>
           </div>
-          <div className="dash-card p-6">
-            <form onSubmit={handleVerify} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("verificationCode")}</Label>
-                <Input
-                  value={verifyCode} onChange={e => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="000000" className="h-12 text-center text-2xl font-mono tracking-[0.5em] bg-muted/30"
-                  maxLength={6} required
-                />
-              </div>
-              {error && <Alert variant="destructive" className="py-2 text-xs"><AlertDescription>{error}</AlertDescription></Alert>}
-              <Button type="submit" className="w-full dash-button-primary" disabled={isLoading || verifyCode.length < 6}>
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ArrowRight className="w-4 h-4 mr-2" />Verify & Continue</>}
-              </Button>
-              <button type="button" className="w-full text-xs text-muted-foreground hover:text-primary transition-colors" onClick={() => toast({ title: "Code resent!", description: `Check ${form.email}` })}>
-                {t("resendCode")}
-              </button>
-            </form>
-          </div>
+
+          <Link href="/login">
+            <Button variant="outline" className="w-full h-11">{t("signIn")}</Button>
+          </Link>
         </div>
       </div>
     );
@@ -156,132 +170,221 @@ export default function RegisterPage() {
       <div className="relative z-10 w-full max-w-xl space-y-6 animate-fade-up">
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-3"><DashLogo size={52} /></div>
-          <h1 className="text-2xl font-headline font-bold">Join Dash</h1>
-          <p className="text-sm text-muted-foreground">The premium campus experience, built for students.</p>
+          <h1 className="text-2xl font-headline font-bold">{t("joinDash")}</h1>
+          <p className="text-sm text-muted-foreground">{t("premiumExperience")}</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest">
+            <ShieldCheck className="w-3 h-3" /> No email required — Student ID only
+          </div>
         </div>
 
         <div className="dash-card p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* School */}
             <div className="space-y-1.5">
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Your School</Label>
-              <Select value={form.schoolId} onValueChange={v => setForm(f => ({ ...f, schoolId: v, email: "" }))} required>
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                {t("yourSchool")}
+              </Label>
+              <Select value={form.schoolId} onValueChange={set("schoolId")} required>
                 <SelectTrigger className="h-10 text-sm bg-muted/30">
-                  <SelectValue placeholder="Select your university…" />
+                  <SelectValue placeholder={t("selectUniversity")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_SCHOOLS.map(s => (
+                  {SCHOOLS.map(s => (
                     <SelectItem key={s.id} value={s.id}>
-                      <div className="flex flex-col">
-                        <span>{s.name}</span>
-                        <span className="text-[10px] text-muted-foreground">@{s.domain}</span>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
+                        {s.name}
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedSchool && (
-                <p className="text-[10px] text-primary flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> Use your @{selectedSchool.domain} email address
-                </p>
-              )}
             </div>
 
+            {/* Student ID */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                Student ID / Registration Number
+              </Label>
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="e.g. 2024CS001 or UB22A001"
+                  className="h-10 text-sm bg-muted/30 pl-9 uppercase font-mono tracking-wider"
+                  value={form.studentId}
+                  onChange={e => set("studentId")(e.target.value.toUpperCase())}
+                  required
+                  autoComplete="username"
+                  autoCapitalize="characters"
+                />
+                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                This is your unique login identifier — exactly as it appears on your student card.
+              </p>
+            </div>
+
+            {/* Full Name + Username */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("fullName")}</Label>
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t("fullName")}
+                </Label>
                 <div className="relative">
-                  <Input className="h-10 text-sm bg-muted/30 pl-9" placeholder="Alex Rivera" required
-                    value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} />
+                  <Input
+                    className="h-10 text-sm bg-muted/30 pl-9"
+                    placeholder="Alex Rivera"
+                    required
+                    value={form.fullName}
+                    onChange={e => set("fullName")(e.target.value)}
+                    autoComplete="name"
+                  />
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("username")}</Label>
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t("username")}
+                </Label>
                 <div className="relative">
-                  <Input className="h-10 text-sm bg-muted/30 pl-9" placeholder="arivera_comp" required
-                    value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, "_") }))} />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                  <Input
+                    className="h-10 text-sm bg-muted/30 pl-9"
+                    placeholder="arivera_comp"
+                    required
+                    value={form.username}
+                    onChange={e => set("username")(e.target.value.toLowerCase().replace(/\s/g, "_"))}
+                    autoComplete="nickname"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">@</span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("institutionalEmail")}</Label>
-              <div className="relative">
-                <Input type="email" className="h-10 text-sm bg-muted/30 pl-9"
-                  placeholder={selectedSchool ? `you@${selectedSchool.domain}` : "your.email@university.edu"}
-                  required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              </div>
-            </div>
-
+            {/* Password + Confirm */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("password")}</Label>
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t("password")}
+                </Label>
                 <div className="relative">
-                  <Input type="password" className="h-10 text-sm bg-muted/30 pl-9" required
-                    value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+                  <Input
+                    type={showPw ? "text" : "password"}
+                    className="h-10 text-sm bg-muted/30 pl-9 pr-10"
+                    required
+                    value={form.password}
+                    onChange={e => set("password")(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Minimum 6 characters</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t("confirmPassword")}
+                </Label>
+                <div className="relative">
+                  <Input
+                    type={showPw ? "text" : "password"}
+                    className="h-10 text-sm bg-muted/30 pl-9"
+                    required
+                    value={form.confirmPassword}
+                    onChange={e => set("confirmPassword")(e.target.value)}
+                    autoComplete="new-password"
+                  />
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("confirmPassword")}</Label>
-                <div className="relative">
-                  <Input type="password" className="h-10 text-sm bg-muted/30 pl-9" required
-                    value={form.confirmPassword} onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))} />
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                </div>
-              </div>
             </div>
 
+            {/* Faculty + Year */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("faculty")}</Label>
-                <Select onValueChange={v => setForm(f => ({ ...f, faculty: v }))}>
-                  <SelectTrigger className="h-10 text-sm bg-muted/30"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t("faculty")}
+                </Label>
+                <Select onValueChange={set("faculty")} required>
+                  <SelectTrigger className="h-10 text-sm bg-muted/30">
+                    <SelectValue placeholder="Select…" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {["Engineering", "Science", "Arts & Humanities", "Business", "Medicine", "Law", "Education"].map(f => (
-                      <SelectItem key={f} value={f}>{f}</SelectItem>
+                    {FACULTIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  {t("yearOfStudy")}
+                </Label>
+                <Select onValueChange={set("year")} required>
+                  <SelectTrigger className="h-10 text-sm bg-muted/30">
+                    <SelectValue placeholder="Year…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[1,2,3,4,5,6,7].map(y => (
+                      <SelectItem key={y} value={String(y)}>Year {y}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("yearOfStudy")}</Label>
-                <Select onValueChange={v => setForm(f => ({ ...f, year: v }))}>
-                  <SelectTrigger className="h-10 text-sm bg-muted/30"><SelectValue placeholder="Year…" /></SelectTrigger>
-                  <SelectContent>
-                    {[1,2,3,4,5,6,7].map(y => <SelectItem key={y} value={String(y)}>Year {y}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
+            {/* Terms */}
             <div className="flex items-start gap-2.5 pt-1">
-              <Checkbox id="terms" className="border-border data-[state=checked]:bg-primary mt-0.5"
-                checked={form.agreed} onCheckedChange={c => setForm(f => ({ ...f, agreed: !!c }))} />
-              <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed">
-                {t("agreeTerms")} and <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>
+              <Checkbox
+                id="terms"
+                className="border-border data-[state=checked]:bg-primary mt-0.5"
+                checked={form.agreed}
+                onCheckedChange={c => set("agreed")(!!c)}
+              />
+              <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                {t("agreeTerms")} and{" "}
+                <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>
               </Label>
             </div>
 
-            {error && <Alert variant="destructive" className="py-2 text-xs"><AlertDescription>{error}</AlertDescription></Alert>}
+            {error && (
+              <Alert variant="destructive" className="py-2.5 text-xs bg-destructive/10">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-            <Button type="submit" className="w-full dash-button-primary" disabled={isLoading || !form.agreed || !form.schoolId}>
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ArrowRight className="w-4 h-4 mr-2" />{t("createAccount")}</>}
+            <Button
+              type="submit"
+              className="w-full dash-button-primary h-11"
+              disabled={loading || !form.agreed || !form.schoolId}
+            >
+              {loading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <><ArrowRight className="w-4 h-4 mr-2" />{t("createAccount")}</>
+              }
             </Button>
           </form>
 
           <div className="flex flex-col items-center gap-3 pt-5 border-t border-border mt-5">
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <ShieldCheck className="w-3 h-3 text-primary" /> Institutional email verification required
+              <ShieldCheck className="w-3 h-3 text-primary" />
+              Student ID verified by your school admin
             </div>
-            <p className="text-xs">{t("alreadyHaveAccount")} <Link href="/login" className="text-primary font-bold hover:underline">{t("signIn")}</Link></p>
+            <p className="text-xs">
+              {t("alreadyHaveAccount")}{" "}
+              <Link href="/login" className="text-primary font-bold hover:underline">
+                {t("signIn")}
+              </Link>
+            </p>
           </div>
         </div>
 
         <div className="text-center text-[10px] text-muted-foreground/50 uppercase tracking-[0.2em]">
-          © 2025 Dash — Campus Connect
+          {t("copyright")}
         </div>
       </div>
     </div>

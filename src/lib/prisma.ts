@@ -1,28 +1,30 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-function createPrismaClient() {
-  // Prisma 7 with driverAdapters requires an adapter or accelerateUrl.
-  // In development without a live DB, we catch the init error gracefully.
-  try {
-    return new PrismaClient({
-      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-      // @ts-ignore — datasourceUrl satisfies Prisma 7 client engine requirement
-      datasourceUrl: process.env.DATABASE_URL,
-    });
-  } catch {
-    // Return a proxy that throws a clear error on any DB call
+function createPrismaClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.warn("[Dash] DATABASE_URL not set — DB calls will fail gracefully.");
     return new Proxy({} as PrismaClient, {
       get(_t, prop) {
         if (prop === "$connect" || prop === "$disconnect") return () => Promise.resolve();
-        throw new Error(`Database not configured. Set DATABASE_URL in .env (accessed: ${String(prop)})`);
+        if (prop === "$transaction") return async (fn: any) => fn({});
+        return new Proxy(() => Promise.reject(new Error("Database not configured. Set DATABASE_URL in .env")), {
+          get: () => () => Promise.reject(new Error("Database not configured. Set DATABASE_URL in .env")),
+        });
       },
     });
   }
+
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({ adapter } as any);
 }
 
 export const prisma: PrismaClient =
-  globalForPrisma.prisma ?? (createPrismaClient() as PrismaClient);
+  globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
