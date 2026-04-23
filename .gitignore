@@ -1,6 +1,4 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# ── Dependencies ──────────────────────────────────────────────────────────────
 /node_modules
 /.pnp
 .pnp.*
@@ -10,37 +8,56 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# ── Next.js build output ───────────────────────────────────────────────────────
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
+# ── Environment variables (NEVER commit these) ────────────────────────────────
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env*.local
 
-# debug
+# ── Logs ──────────────────────────────────────────────────────────────────────
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+dev.log
+dev.err.log
+dev-output.txt
 
-# vercel
-.vercel
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.pem
 
-# typescript
+# ── TypeScript ────────────────────────────────────────────────────────────────
 *.tsbuildinfo
 next-env.d.ts
 
-.genkit/*
-.env*
+# ── Vercel ────────────────────────────────────────────────────────────────────
+.vercel
 
-# firebase
+# ── Genkit ────────────────────────────────────────────────────────────────────
+.genkit/*
+
+# ── Firebase (legacy, not used) ───────────────────────────────────────────────
 firebase-debug.log
 firestore-debug.log
+
+# ── Prisma generated ──────────────────────────────────────────────────────────
 /src/generated/prisma
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+.modified
+coverage/
