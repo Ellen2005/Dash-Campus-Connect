@@ -73,14 +73,24 @@ export default function AdminAnnouncementsPage() {
 
   const removeTag = (id: string) => setTaggedStudents(prev => prev.filter(s => s.id !== id));
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!draft.trim()) return;
     setIsAiLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/ai/announcement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftMessage: draft, context }),
+      });
+      const data = await res.json();
+      setSuggestion(data);
+      toast({ title: "Draft Optimized ✨", description: "AI has suggested a title and priority level." });
+    } catch {
       setSuggestion(mockAnnouncementAssistant(draft));
+      toast({ title: "Draft Optimized", description: "Using local AI (API unavailable)." });
+    } finally {
       setIsAiLoading(false);
-      toast({ title: "Draft Optimized", description: "AI has suggested a title and priority level." });
-    }, 1200);
+    }
   };
 
   const handleSend = () => {

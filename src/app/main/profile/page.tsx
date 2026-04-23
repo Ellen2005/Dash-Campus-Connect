@@ -50,12 +50,25 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [notifs, setNotifs] = useState(true);
 
-  const handleGenerateBio = () => {
+  const handleGenerateBio = async () => {
     setGeneratingBio(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/ai/bio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ academicField: faculty, interests }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBio(data.bio);
+      } else {
+        setBio(`${faculty} student with a passion for ${interests.split(",")[0].trim()}. Building the future one line of code at a time.`);
+      }
+    } catch {
       setBio(`${faculty} student with a passion for ${interests.split(",")[0].trim()}. Building the future one line of code at a time.`);
+    } finally {
       setGeneratingBio(false);
-    }, 1200);
+    }
   };
 
   const handleSave = () => {

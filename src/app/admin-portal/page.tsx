@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,16 +47,92 @@ export default function AdminPortalPage() {
   const [announcement, setAnnouncement] = useState("");
   const [sending, setSending] = useState(false);
   const [requireApproval, setRequireApproval] = useState(true);
+  const [adminSchoolId, setAdminSchoolId] = useState<string | null>(null);
+  const [adminSchoolName, setAdminSchoolName] = useState<string | null>(null);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState("");
 
-  const approve = (id: string) => {
+  useEffect(() => {
+    try {
+      setAdminSchoolId(localStorage.getItem("dash_admin_schoolId"));
+      setAdminSchoolName(localStorage.getItem("dash_admin_schoolName"));
+    } catch {
+      setAdminSchoolId(null);
+      setAdminSchoolName(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!adminSchoolId) return;
+
+    const run = async () => {
+      setPendingError("");
+      setPendingLoading(true);
+      try {
+        const res = await fetch(`/api/admin/pending-users?schoolId=${encodeURIComponent(adminSchoolId)}`);
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          setPendingError(json?.error ?? "Failed to load pending approvals.");
+          return;
+        }
+        if (Array.isArray(json?.users)) {
+          setPendingList(json.users);
+        }
+      } catch {
+        setPendingError("Network error while loading pending approvals.");
+      } finally {
+        setPendingLoading(false);
+      }
+    };
+
+    run();
+  }, [adminSchoolId]);
+
+  const approve = async (id: string) => {
     const s = pendingList.find(p => p.id === id)!;
+
+    if (adminSchoolId) {
+      try {
+        const res = await fetch("/api/admin/approve-user", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ userId: id }),
+        });
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          toast({ title: "Approval failed", description: json?.error ?? "Please try again." });
+          return;
+        }
+      } catch {
+        toast({ title: "Approval failed", description: "Network error. Please try again." });
+        return;
+      }
+    }
     setPendingList(l => l.filter(p => p.id !== id));
     setStudents(prev => [...prev, { id: `s${Date.now()}`, name: s.name, studentId: s.studentId, email: "", role: "student", status: "active", faculty: s.faculty }]);
     toast({ title: `✅ ${s.name} ${t("approveStudent").toLowerCase()}`, description: "They can now access the campus platform." });
   };
 
-  const reject = (id: string) => {
+  const reject = async (id: string) => {
     const s = pendingList.find(p => p.id === id)!;
+
+    if (adminSchoolId) {
+      try {
+        const res = await fetch("/api/admin/reject-user", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ userId: id }),
+        });
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          toast({ title: "Rejection failed", description: json?.error ?? "Please try again." });
+          return;
+        }
+      } catch {
+        toast({ title: "Rejection failed", description: "Network error. Please try again." });
+        return;
+      }
+    }
     setPendingList(l => l.filter(p => p.id !== id));
     toast({ title: `❌ ${s.name} ${t("rejectStudent").toLowerCase()}`, description: "Registration denied." });
   };
@@ -72,6 +148,16 @@ export default function AdminPortalPage() {
   };
 
   const resolveFlag = (id: string) => setFlags(f => f.filter(x => x.id !== id));
+
+  const signOutAdmin = () => {
+    try {
+      localStorage.removeItem("dash_admin_schoolId");
+      localStorage.removeItem("dash_admin_schoolName");
+    } catch {
+      // ignore
+    }
+    window.location.href = "/admin-portal/login";
+  };
 
   const sendAnnouncement = () => {
     if (!announcement.trim()) return;
@@ -115,7 +201,7 @@ export default function AdminPortalPage() {
               <Megaphone className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{t("broadcast")}</span>
             </Button>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground text-xs h-8" onClick={() => window.location.href = '/admin-portal/login'}>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground text-xs h-8" onClick={signOutAdmin}>
               <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Sign Out</span>
             </Button>
@@ -164,6 +250,27 @@ export default function AdminPortalPage() {
 
           {/* Pending Approvals */}
           <TabsContent value="pending" className="pt-4 space-y-3">
+            {!adminSchoolId && (
+              <div className="dash-card p-4 text-xs text-muted-foreground">
+                Sign in at <span className="font-mono text-primary">/admin-portal/login</span> to load real pending approvals. Otherwise, the portal shows demo data.
+              </div>
+            )}
+            {adminSchoolId && adminSchoolName && (
+              <div className="dash-card p-4 text-xs text-muted-foreground">
+                Signed in as <span className="font-semibold text-foreground">{adminSchoolName}</span>{" "}
+                (<span className="font-mono text-primary">{adminSchoolId}</span>).
+              </div>
+            )}
+            {pendingLoading && (
+              <div className="dash-card p-4 text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading pending approvalsâ€¦
+              </div>
+            )}
+            {pendingError && (
+              <div className="dash-card p-4 text-xs text-destructive border border-destructive/20 bg-destructive/10">
+                {pendingError}
+              </div>
+            )}
             {pendingList.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-3 opacity-30" />

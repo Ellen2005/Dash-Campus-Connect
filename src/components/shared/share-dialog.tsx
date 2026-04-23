@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,6 +56,7 @@ export function ShareDialog({ open, onClose, post }: ShareDialogProps) {
             <Repeat2 className="w-4 h-4 text-primary" />
             {t("share")}
           </DialogTitle>
+          <DialogDescription className="sr-only">Share this post</DialogDescription>
         </DialogHeader>
 
         {mode === "menu" && (

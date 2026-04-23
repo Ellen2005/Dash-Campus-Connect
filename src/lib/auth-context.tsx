@@ -1,24 +1,35 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { User, Session } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Singleton — one client for the entire app lifetime
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+          storageKey: "dash-auth-token",
+        },
+      }
+    );
+  }
+  return _supabase;
+}
 
-/**
- * Converts a Student ID + School ID into a synthetic internal email.
- * Students never see this — it's only used internally with Supabase Auth.
- * Format: studentid@schoolid.dash.internal
- * Example: 2024CS001@ubuea.dash.internal
- */
+export const supabase = getSupabase();
+
 export function toSyntheticEmail(studentId: string, schoolId: string): string {
   const cleanId = studentId.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   const cleanSchool = schoolId.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `${cleanId}@${cleanSchool}.dash.internal`;
+  return `${cleanId}.${cleanSchool}@dash-campus.app`;
 }
 
 interface DashUser {
@@ -51,7 +62,7 @@ interface AuthContextType {
     year: string;
   }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  supabase: typeof supabase;
+  supabase: SupabaseClient;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -62,44 +73,52 @@ const AuthContext = createContext<AuthContextType>({
   supabase,
 });
 
+function buildDashUser(u: User): DashUser {
+  const meta = u.user_metadata ?? {};
+  return {
+    id: u.id,
+    studentId: meta.student_id ?? "",
+    fullName: meta.full_name ?? "Student",
+    username: meta.username ?? "user",
+    schoolId: meta.school_id ?? "",
+    schoolName: meta.school_name ?? "",
+    faculty: meta.faculty ?? "",
+    year: meta.year ?? "",
+    role: meta.role ?? "student",
+    status: meta.status ?? "pending",
+    avatar: meta.avatar_url,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [dashUser, setDashUser] = useState<DashUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-
-  function buildDashUser(supabaseUser: User): DashUser {
-    const meta = supabaseUser.user_metadata ?? {};
-    return {
-      id: supabaseUser.id,
-      studentId: meta.student_id ?? "",
-      fullName: meta.full_name ?? "Student",
-      username: meta.username ?? "user",
-      schoolId: meta.school_id ?? "",
-      schoolName: meta.school_name ?? "",
-      faculty: meta.faculty ?? "",
-      year: meta.year ?? "",
-      role: meta.role ?? "student",
-      status: meta.status ?? "pending",
-      avatar: meta.avatar_url,
-    };
-  }
+  const initialized = useRef(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      const u = data.session?.user ?? null;
+    if (initialized.current) return;
+    initialized.current = true;
+
+    const client = getSupabase();
+
+    // Get initial session once
+    client.auth.getSession().then(({ data }) => {
+      const s = data.session;
+      setSession(s);
+      const u = s?.user ?? null;
       setUser(u);
       if (u) setDashUser(buildDashUser(u));
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      const u = session?.user ?? null;
+    // Listen for auth changes
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      const u = s?.user ?? null;
       setUser(u);
-      if (u) setDashUser(buildDashUser(u));
-      else setDashUser(null);
+      setDashUser(u ? buildDashUser(u) : null);
       setLoading(false);
     });
 
@@ -109,41 +128,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (studentId: string, schoolId: string, password: string) => {
     const email = toSyntheticEmail(studentId, schoolId);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
+    return { error: error?.message ?? null };
   };
 
   const signUp = async (data: {
     studentId: string; schoolId: string; password: string;
     fullName: string; username: string; faculty: string; year: string;
   }) => {
-    const email = toSyntheticEmail(data.studentId, data.schoolId);
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password: data.password,
-      options: {
-        emailRedirectTo: undefined,
-        data: {
-          student_id: data.studentId.trim().toUpperCase(),
-          full_name: data.fullName,
-          username: data.username,
-          school_id: data.schoolId,
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          studentId: data.studentId.trim().toUpperCase(),
+          schoolId: data.schoolId,
+          password: data.password,
+          fullName: data.fullName,
+          username: data.username.trim().toLowerCase().replace(/\s/g, "_"),
           faculty: data.faculty,
           year: data.year,
-          role: "student",
-          status: "pending",
-        },
-      },
-    });
-
-    if (error) return { error: error.message };
-    return { error: null };
+        }),
+      });
+      const json = await res.json().catch(() => ({} as Record<string, string>));
+      if (!res.ok) return { error: json?.error ?? "Registration failed. Please try again." };
+      return { error: null };
+    } catch {
+      return { error: "Network error. Please check your connection and try again." };
+    }
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
     setDashUser(null);
+    setSession(null);
   };
 
   return (
@@ -154,4 +172,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-export { supabase };

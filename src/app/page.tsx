@@ -66,7 +66,7 @@ export default function LandingPage() {
             </Link>
             <div className="flex items-center gap-2 text-xs text-muted-foreground self-center">
               <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-              Verified .edu emails only
+              Verified campus accounts (Student ID based)
             </div>
           </div>
 

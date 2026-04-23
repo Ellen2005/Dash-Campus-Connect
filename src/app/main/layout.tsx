@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ServerSidebar, ChannelSidebar } from "@/components/layout/discord-sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Users, Search, X, Settings, Shield, MessageCircle } from "lucide-react";
+import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Users, Search, X, Settings, Shield, MessageCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { DashLogo } from "@/components/shared/dash-logo";
+import { useAuth } from "@/lib/auth-context";
 
 const mobileNavItems = (t: (k: any) => string) => [
   { href: "/main",              icon: Home,        label: t("feed") },
@@ -32,11 +33,63 @@ const drawerLinks = (t: (k: any) => string) => [
 ];
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const { t } = useI18n();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user, dashUser, loading, signOut } = useAuth();
 
   const navItems = mobileNavItems(t);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loadingâ€¦
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  if (dashUser?.status === "pending") {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="w-full max-w-md space-y-4 text-center">
+          <div className="flex justify-center">
+            <DashLogo size={56} />
+          </div>
+          <h1 className="text-2xl font-headline font-bold">Awaiting Admin Approval</h1>
+          <p className="text-sm text-muted-foreground">
+            Your account is created, but access is limited until your school admin approves you.
+          </p>
+          <div className="dash-card p-5 space-y-3 text-left">
+            <p className="text-xs text-muted-foreground">
+              Student ID: <span className="font-mono text-primary font-bold">{dashUser.studentId}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              School: <span className="font-semibold text-foreground">{dashUser.schoolId || "Unknown"}</span>
+            </p>
+          </div>
+          <div className="flex gap-2 justify-center">
+            <Button className="dash-button-primary" onClick={() => router.replace("/")}>
+              Back to Home
+            </Button>
+            <Button variant="outline" onClick={() => signOut()}>
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background">

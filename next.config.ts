@@ -4,11 +4,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  turbopack: {
-    root: __dirname,
-  },
   experimental: {
-    workerThreads: true,
     optimizePackageImports: [
       'lucide-react',
       '@radix-ui/react-accordion',

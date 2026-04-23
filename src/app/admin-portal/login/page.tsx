@@ -43,6 +43,12 @@ export default function AdminLoginPage() {
         return;
       }
       toast({ title: `Welcome, ${admin.schoolName} Admin 👋`, description: "You are now logged in to the admin portal." });
+      try {
+        localStorage.setItem("dash_admin_schoolId", admin.schoolId);
+        localStorage.setItem("dash_admin_schoolName", admin.schoolName);
+      } catch {
+        // ignore storage errors (private mode, blocked storage, etc.)
+      }
       router.push("/admin-portal");
     }, 1000);
   };

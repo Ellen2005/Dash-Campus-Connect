@@ -1,16 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
+// Must match the format used in register
 function toSyntheticEmail(studentId: string, schoolId: string): string {
   const cleanId = studentId.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
   const cleanSchool = schoolId.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `${cleanId}@${cleanSchool}.dash.internal`;
+  return `${cleanId}.${cleanSchool}@dash-campus.app`;
 }
 
 const LoginSchema = z.object({
@@ -24,8 +20,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { studentId, schoolId, password } = LoginSchema.parse(body);
 
-    const email = toSyntheticEmail(studentId, schoolId);
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
 
+    const email = toSyntheticEmail(studentId, schoolId);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error || !data.session) {
