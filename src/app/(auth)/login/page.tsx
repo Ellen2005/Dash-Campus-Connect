@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,7 @@ import { DashLogo } from "@/components/shared/dash-logo";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n";
 
-const SCHOOLS = [
-  { id: "uyd",   name: "University of Yaoundé I" },
-  { id: "ubuea", name: "University of Buea" },
-  { id: "demo",  name: "Demo University" },
-];
+type School = { id: string; name: string };
 
 const ERROR_MAP: Record<string, string> = {
   "Invalid login credentials": "Incorrect Student ID or password. Please try again.",
@@ -46,6 +42,22 @@ export default function LoginPage() {
   const [showPw, setShowPw]       = useState(false);
   const [error, setError]         = useState("");
   const [loading, setLoading]     = useState(false);
+  const [schools, setSchools]     = useState<School[]>([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(true);
+
+  useEffect(() => {
+    const run = async () => {
+      setSchoolsLoading(true);
+      try {
+        const res = await fetch("/api/schools", { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (res.ok && Array.isArray(json?.schools)) setSchools(json.schools);
+      } finally {
+        setSchoolsLoading(false);
+      }
+    };
+    run();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +114,7 @@ export default function LoginPage() {
                   <SelectValue placeholder={t("selectUniversity")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCHOOLS.map(s => (
+                  {schools.map(s => (
                     <SelectItem key={s.id} value={s.id}>
                       <div className="flex items-center gap-2">
                         <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
@@ -112,6 +124,9 @@ export default function LoginPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {schoolsLoading && (
+                <p className="text-[10px] text-muted-foreground">Loading schools…</p>
+              )}
             </div>
 
             {/* Student ID */}
@@ -182,7 +197,7 @@ export default function LoginPage() {
             </div>
             <p className="text-xs">
               {t("noAccount")}{" "}
-              <Link href="/choose-language" className="text-primary font-bold hover:underline">
+              <Link href="/register" className="text-primary font-bold hover:underline">
                 {t("joinCampus")}
               </Link>
             </p>

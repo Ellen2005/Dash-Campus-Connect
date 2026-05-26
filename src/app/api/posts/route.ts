@@ -20,7 +20,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
     const skip = (page - 1) * limit
 
+    const authorId = searchParams.get('authorId')?.trim()
+
+    const where: any = {}
+    if (authorId) where.authorId = authorId
+
     const posts = await prisma.post.findMany({
+      where,
       skip,
       take: limit,
       orderBy: {
@@ -56,7 +62,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const total = await prisma.post.count()
+    const total = await prisma.post.count({ where })
 
     return NextResponse.json({
       posts,

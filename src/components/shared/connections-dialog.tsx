@@ -48,6 +48,7 @@ export function ConnectionsDialog({ open, onClose }: ConnectionsDialogProps) {
       <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{t("connections")}</DialogTitle>
+          <DialogDescription className="sr-only">Manage your connections and find people</DialogDescription>
         </DialogHeader>
 
         <div className="relative">

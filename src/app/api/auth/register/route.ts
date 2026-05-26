@@ -12,13 +12,15 @@ function toSyntheticEmail(studentId: string, schoolId: string): string {
 }
 
 const RegisterSchema = z.object({
-  studentId: z.string().min(2).max(50),
-  schoolId:  z.string().min(1).max(50),
-  password:  z.string().min(6),
-  fullName:  z.string().min(2).max(100),
-  username:  z.string().min(3).max(30).regex(/^[a-z0-9_]+$/, "Username can only contain lowercase letters, numbers and underscores"),
-  faculty:   z.string().optional(),
-  year:      z.string().optional(),
+  studentId:     z.string().min(2).max(50),
+  schoolId:      z.string().min(1).max(50),
+  password:      z.string().min(6),
+  fullName:      z.string().min(2).max(100),
+  username:      z.string().min(3).max(30).regex(/^[a-z0-9_]+$/, "Username can only contain lowercase letters, numbers and underscores"),
+  faculty:       z.string().optional(),
+  year:          z.string().optional(),
+  fieldOfStudyId: z.string().optional(),
+  levelId:       z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -38,12 +40,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { studentId, schoolId, password, fullName, username, faculty, year } = RegisterSchema.parse(body);
+    const { studentId, schoolId, password, fullName, username, faculty, year, fieldOfStudyId, levelId } = RegisterSchema.parse(body);
 
     const email = toSyntheticEmail(studentId, schoolId);
 
     // Check if already registered
-    const { data: existing } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const { data: existing, error: listError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (listError) {
+      return NextResponse.json({ error: `Unable to validate account uniqueness: ${listError.message}` }, { status: 503 });
+    }
     const alreadyExists = existing?.users?.some(u => u.email === email);
     if (alreadyExists) {
       return NextResponse.json(
@@ -81,12 +86,14 @@ export async function POST(request: NextRequest) {
     try {
       await prisma.user.create({
         data: {
-          id:       authData.user.id,
+          id:             authData.user.id,
           email,
-          name:     fullName,
-          username: username.toLowerCase(),
-          major:    faculty,
-          year,
+          name:           fullName,
+          username:       username.toLowerCase(),
+          schoolId:       schoolId || undefined,
+          fieldOfStudyId: fieldOfStudyId || undefined,
+          levelId:        levelId || undefined,
+          approvalStatus: 'PENDING',
         },
       });
     } catch (dbErr) {
@@ -102,6 +109,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors.map(e => e.message).join(", ") }, { status: 400 });
+    }
+    const msg = (error as any)?.message?.toString?.() ?? "";
+    const isDns = msg.includes("EAI_AGAIN") || msg.includes("getaddrinfo");
+    if (isDns) {
+      return NextResponse.json(
+        { error: "Temporary network/DNS error while contacting Supabase. Please retry." },
+        { status: 503 }
+      );
     }
     console.error("[Register API]", error);
     return NextResponse.json({ error: "Server error. Please try again." }, { status: 500 });

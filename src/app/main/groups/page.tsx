@@ -1,61 +1,218 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Plus, Users, Lock, Globe, Check, Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { ensureDbUser } from "@/lib/client-user";
+import { useAuth } from "@/lib/auth-context";
 
-const mockGroups = [
-  { id: "g1", name: "Computer Science '26", desc: "All CS students graduating in 2026", members: 342, type: "public", joined: true, avatar: "https://picsum.photos/seed/cs/80/80" },
-  { id: "g2", name: "Women in STEM", desc: "Empowering women in science and technology", members: 218, type: "public", joined: true, avatar: "https://picsum.photos/seed/wstem/80/80" },
-  { id: "g3", name: "Algorithms Study Group", desc: "Weekly sessions on data structures and algorithms", members: 45, type: "private", joined: false, avatar: "https://picsum.photos/seed/algo/80/80" },
-  { id: "g4", name: "Campus Photography Club", desc: "Share your campus shots and learn together", members: 127, type: "public", joined: false, avatar: "https://picsum.photos/seed/photo/80/80" },
-  { id: "g5", name: "Entrepreneurship Hub", desc: "Build, pitch, and grow your startup ideas", members: 89, type: "public", joined: false, avatar: "https://picsum.photos/seed/entre/80/80" },
-  { id: "g6", name: "Medical Students Network", desc: "Resources and support for med students", members: 203, type: "private", joined: false, avatar: "https://picsum.photos/seed/med/80/80" },
-];
+interface GroupItem {
+  id: string;
+  name: string;
+  desc: string;
+  members: number;
+  type: "public" | "private";
+  joined: boolean;
+  requested?: boolean;
+  ownerId?: string;
+  avatar?: string;
+}
+
+type JoinRequest = {
+  id: string;
+  groupId: string;
+  requesterId: string;
+  groupName: string;
+  createdAt: string;
+  requester: { id: string; name: string; username: string; profilePhoto?: string } | null;
+};
 
 export default function GroupsPage() {
   const { t } = useI18n();
   const { toast } = useToast();
+  const { dashUser, session } = useAuth();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
-  const [joinedMap, setJoinedMap] = useState<Record<string, boolean>>(
-    Object.fromEntries(mockGroups.map(g => [g.id, g.joined]))
-  );
+  const [groups, setGroups] = useState<GroupItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [workingGroupId, setWorkingGroupId] = useState<string | null>(null);
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: "", desc: "", type: "public" });
 
-  const filtered = mockGroups.filter(g =>
-    g.name.toLowerCase().includes(query.toLowerCase()) ||
-    g.desc.toLowerCase().includes(query.toLowerCase())
-  );
-  const myGroups = filtered.filter(g => joinedMap[g.id]);
-  const discover = filtered.filter(g => !joinedMap[g.id]);
+  const loadGroups = async () => {
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "50");
+      if (query.trim()) params.set("search", query.trim());
 
-  const toggleJoin = (id: string) => {
-    setJoinedMap(m => ({ ...m, [id]: !m[id] }));
-    toast({ title: joinedMap[id] ? "Left group" : "Joined group!" });
+      const res = await fetch(`/api/groups?${params.toString()}`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load groups.");
+
+      const nextGroups: GroupItem[] = Array.isArray(json?.groups)
+        ? json.groups.map((group: any) => ({
+            id: group.id,
+            name: group.name,
+            desc: group.description ?? "",
+            members: group._count?.members ?? 0,
+            type: group.isPublic ? "public" : "private",
+            joined: dashUser ? group.members?.some((member: any) => member.userId === dashUser.id) : false,
+            requested: false,
+            ownerId: group.creatorId ?? undefined,
+            avatar: group.photo ?? "",
+          }))
+        : [];
+
+      setGroups(nextGroups);
+    } catch (error: any) {
+      toast({ title: t("groupsUnavailable"), description: error?.message ?? "Please try again." });
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  useEffect(() => {
+    setLoading(true);
+    void loadGroups();
+  }, [query, dashUser?.id]);
+
+  useEffect(() => {
+    // Enable "Create community" deep-link: /main/groups?create=true
+    if (searchParams.get("create") === "true") {
+      setCreateOpen(true);
+    }
+  }, [searchParams]);
+
+  const loadRequests = async () => {
+    if (!dashUser) return;
+    setLoadingRequests(true);
+    try {
+      const res = await fetch(`/api/groups/join-requests?ownerId=${encodeURIComponent(dashUser.id)}`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load join requests.");
+      setRequests(Array.isArray(json?.requests) ? json.requests : []);
+    } catch (error: any) {
+      toast({ title: "Join requests unavailable", description: error?.message ?? "Please try again." });
+      setRequests([]);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRequests();
+  }, [dashUser?.id]);
+
+  const filtered = useMemo(() => groups, [groups]);
+  const myGroups = filtered.filter((g) => g.joined);
+  const discover = filtered.filter((g) => !g.joined);
+
+  const toggleJoin = async (group: GroupItem) => {
+    if (!dashUser) return;
+
+    setWorkingGroupId(group.id);
+    try {
+      await ensureDbUser(dashUser, session);
+      const endpoint = group.joined ? `/api/groups/${group.id}/leave` : `/api/groups/${group.id}/join`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: dashUser.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Request failed.");
+
+      setGroups((current) =>
+        current.map((item) =>
+          item.id === group.id
+            ? {
+                ...item,
+                joined: json?.requested ? false : !group.joined,
+                requested: !!json?.requested,
+                members: json?.requested ? item.members : Math.max(0, item.members + (group.joined ? -1 : 1)),
+              }
+            : item
+        )
+      );
+      toast({ title: json?.requested ? "Request sent for approval" : group.joined ? t("groupLeft") : t("groupJoined") });
+    } catch (error: any) {
+      toast({ title: t("groupUpdateFailed"), description: error?.message ?? "Please try again." });
+    } finally {
+      setWorkingGroupId(null);
+    }
+  };
+
+  const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !dashUser) return;
+
     setCreating(true);
-    setTimeout(() => {
+    try {
+      await ensureDbUser(dashUser, session);
+      const res = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          description: form.desc.trim(),
+          creatorId: dashUser.id,
+          type: "STUDENT_CREATED",
+          isPublic: form.type === "public",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to create group.");
+
+      await loadGroups();
       setCreating(false);
       setCreateOpen(false);
       setForm({ name: "", desc: "", type: "public" });
-      toast({ title: "Group created!", description: `"${form.name}" is now live.` });
-    }, 1000);
+      toast({ title: t("groupCreated"), description: form.name.trim() });
+    } catch (error: any) {
+      setCreating(false);
+      toast({ title: t("groupCreationFailed"), description: error?.message ?? "Please try again." });
+    }
+  };
+
+  const handleRequestAction = async (req: JoinRequest, action: "approve" | "reject") => {
+    if (!dashUser) return;
+    try {
+      const res = await fetch("/api/groups/join-requests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ownerId: dashUser.id,
+          groupId: req.groupId,
+          requesterId: req.requesterId,
+          action,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to process request.");
+      setRequests((prev) => prev.filter((x) => x.id !== req.id));
+      if (action === "approve") {
+        setGroups((prev) => prev.map((g) => (g.id === req.groupId ? { ...g, members: g.members + 1 } : g)));
+      }
+      toast({ title: action === "approve" ? "Request approved" : "Request rejected" });
+    } catch (error: any) {
+      toast({ title: "Request action failed", description: error?.message ?? "Please try again." });
+    }
   };
 
   return (
@@ -74,25 +231,56 @@ export default function GroupsPage() {
 
       <Tabs defaultValue="discover">
         <TabsList className="bg-transparent h-auto p-0 gap-5 border-b w-full justify-start rounded-none">
-          {(["discover", "myGroups"] as const).map(v => (
+          {(["discover", "myGroups", "requests"] as const).map(v => (
             <TabsTrigger key={v} value={v} className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-0 py-2.5 text-sm font-medium text-muted-foreground">
-              {t(v)} {v === "myGroups" ? `(${myGroups.length})` : `(${discover.length})`}
+              {v === "myGroups"
+                ? `${t(v)} (${myGroups.length})`
+                : v === "discover"
+                  ? `${t(v)} (${discover.length})`
+                  : `Requests (${requests.length})`}
             </TabsTrigger>
           ))}
         </TabsList>
 
         <TabsContent value="discover" className="pt-4 space-y-3">
+          {loading && <LoadingState />}
           {discover.map((g, i) => (
-            <GroupRow key={g.id} group={g} joined={false} onToggle={toggleJoin} t={t} delay={i * 40} />
+            <GroupRow key={g.id} group={g} onToggle={toggleJoin} t={t} delay={i * 40} loading={workingGroupId === g.id} />
           ))}
-          {discover.length === 0 && <EmptyState t={t} />}
+          {!loading && discover.length === 0 && <EmptyState t={t} />}
         </TabsContent>
 
         <TabsContent value="myGroups" className="pt-4 space-y-3">
+          {loading && <LoadingState />}
           {myGroups.map((g, i) => (
-            <GroupRow key={g.id} group={g} joined={true} onToggle={toggleJoin} t={t} delay={i * 40} />
+            <GroupRow key={g.id} group={g} onToggle={toggleJoin} t={t} delay={i * 40} loading={workingGroupId === g.id} />
           ))}
-          {myGroups.length === 0 && <EmptyState t={t} />}
+          {!loading && myGroups.length === 0 && <EmptyState t={t} />}
+        </TabsContent>
+
+        <TabsContent value="requests" className="pt-4 space-y-3">
+          {loadingRequests ? <LoadingState /> : requests.length === 0 ? <EmptyState t={t} /> : requests.map((r) => (
+            <div key={r.id} className="dash-card p-3.5 flex items-center gap-3">
+              <Avatar className="w-10 h-10 rounded-xl shrink-0">
+                <AvatarImage src={r.requester?.profilePhoto} />
+                <AvatarFallback className="rounded-xl bg-primary/15 text-primary font-bold">
+                  {(r.requester?.name ?? "U")[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{r.requester?.name ?? "Student"} wants to join</p>
+                <p className="text-[11px] text-muted-foreground truncate">{r.groupName} · @{r.requester?.username ?? "user"}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => handleRequestAction(r, "reject")}>
+                  Reject
+                </Button>
+                <Button size="sm" className="dash-button-primary h-7 text-[11px]" onClick={() => handleRequestAction(r, "approve")}>
+                  Approve
+                </Button>
+              </div>
+            </div>
+          ))}
         </TabsContent>
       </Tabs>
 
@@ -101,15 +289,18 @@ export default function GroupsPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">{t("createGroup")}</DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Create a public or private community group. Private groups require approval before members can access content.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("groupName")}</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. CS Study Group" className="h-9 text-sm bg-muted/30" required />
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t("groupName")} className="h-9 text-sm bg-muted/30" required />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("groupDescription")}</Label>
-              <Textarea value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} placeholder="What is this group about?" className="min-h-[80px] resize-none text-sm bg-muted/30" />
+              <Textarea value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} placeholder={t("whatIsGroupAbout")} className="min-h-[80px] resize-none text-sm bg-muted/30" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("groupType")}</Label>
@@ -135,7 +326,7 @@ export default function GroupsPage() {
   );
 }
 
-function GroupRow({ group, joined, onToggle, t, delay }: { group: typeof mockGroups[0]; joined: boolean; onToggle: (id: string) => void; t: (k: any) => string; delay: number }) {
+function GroupRow({ group, onToggle, t, delay, loading }: { group: GroupItem; onToggle: (group: GroupItem) => void; t: (k: any) => string; delay: number; loading: boolean }) {
   return (
     <div className="dash-card p-3.5 flex items-center gap-3 hover:border-primary/25 transition-all duration-150 animate-in fade-in duration-200" style={{ animationDelay: `${delay}ms` }}>
       <Avatar className="w-11 h-11 rounded-xl shrink-0">
@@ -153,16 +344,45 @@ function GroupRow({ group, joined, onToggle, t, delay }: { group: typeof mockGro
           <span className="text-[10px] text-muted-foreground">{group.members.toLocaleString()} {t("members")}</span>
         </div>
       </div>
-      <Button
-        size="sm"
-        variant={joined ? "outline" : "default"}
-        className={cn("h-7 text-[11px] px-3 rounded-full shrink-0",
-          joined ? "border-primary/30 text-primary hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30" : "dash-button-primary h-7 text-[11px] px-3"
+      <div className="flex flex-col gap-1 shrink-0">
+        {group.joined && (
+          <Link href={`/main/search?communityId=${encodeURIComponent(group.id)}`}>
+            <Button size="sm" variant="outline" className="h-7 text-[11px] px-3 rounded-full">
+              Search Community
+            </Button>
+          </Link>
         )}
-        onClick={() => onToggle(group.id)}
-      >
-        {joined ? <><Check className="w-3 h-3 mr-1" />{t("joined")}</> : t("joinGroup")}
-      </Button>
+        <Button
+          size="sm"
+          variant={group.joined || group.requested ? "outline" : "default"}
+          className={cn("h-7 text-[11px] px-3 rounded-full",
+            group.joined
+              ? "border-primary/30 text-primary hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+              : group.requested
+                ? "border-border text-muted-foreground"
+                : "dash-button-primary h-7 text-[11px] px-3"
+          )}
+          onClick={() => onToggle(group)}
+          disabled={loading || !!group.requested}
+        >
+          {loading
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : group.joined
+              ? <><Check className="w-3 h-3 mr-1" />{t("joined")}</>
+              : group.requested
+                ? "Requested"
+                : t("joinGroup")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  const { t } = useI18n();
+  return (
+    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("loadingGroups")}
     </div>
   );
 }

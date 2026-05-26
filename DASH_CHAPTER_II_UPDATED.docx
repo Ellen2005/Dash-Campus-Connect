@@ -1,0 +1,501 @@
+# CHAPTER II
+
+## TECHNICAL STUDY
+
+### DASH — CAMPUS CONNECT
+
+This chapter presents the technical plan for the design, development, and deployment of Dash (Campus Connect). It describes the required hardware, software, and human resources; explains the technology choices; outlines the platform architecture; and details the operational means used to ensure security, reliability, and scalability.
+
+---
+
+## Table of Contents
+
+- Table of Contents
+- Abbreviations & Acronyms
+- 2.1 Overview of the Solution
+  - 2.1.1 Primary Goals
+- 2.2 Implementation — Development Tools & Technologies
+  - 2.2.1 Development Environment
+  - 2.2.2 Frontend — Web Application Layer
+  - 2.2.3 Backend Services & Database
+  - 2.2.4 Alternative & Reference Tools
+- 2.3 Hardware Resources
+  - 2.3.1 Development Hardware — Minimum Recommendation
+  - 2.3.2 Deployment Infrastructure — Production Target
+- 2.4 Software Resources
+  - 2.4.1 Core Software Components
+  - 2.4.2 Supporting Software — Operations
+- 2.5 Human Resources — Team Organization
+  - 2.5.1 Communication Student — Communication & Documentation
+  - 2.5.2 Banking & Finance Student — Business Context & Viability
+  - 2.5.3 Software Developer — Implementation & Technical Architecture
+- 2.6 Architecture of the Platform
+  - 2.6.1 High-Level Architecture
+  - 2.6.2 UML Diagrams
+- 2.7 Security Strategy
+  - 2.7.1 Authentication & Access Control
+  - 2.7.2 Database Security — Row-Level Security (RLS)
+  - 2.7.3 Data Protection & Privacy
+  - 2.7.4 Operational Security
+- 2.8 Performance & Scalability
+  - 2.8.1 Performance Considerations
+  - 2.8.2 Scalability Considerations
+- 2.9 Testing Strategy
+  - 2.9.1 Levels of Testing
+  - 2.9.2 Manual Test Plan
+- 2.10 Pages of the Application
+  - 2.10.1 Landing Page (Public)
+  - 2.10.2 Language Selection
+  - 2.10.3 Student Registration — Join Dash
+  - 2.10.4 Awaiting Admin Approval
+  - 2.10.5 Admin Portal — Main Admin (School Administrator)
+  - 2.10.6 Student Login — Sign In
+  - 2.10.7 Onboarding — First-Time Users
+  - 2.10.8 Campus Feed — Home / Main Feed
+  - 2.10.9 Campus Events
+  - 2.10.10 Campus Groups
+  - 2.10.11 Campus Marketplace
+  - 2.10.12 Lost & Found
+  - 2.10.13 Search
+  - 2.10.14 Messages — Direct Messaging
+  - 2.10.15 Student Profile
+  - 2.10.16 Notifications
+  - 2.10.17 In-App Admin Console — Student Admin
+  - 2.10.18 Campus Broadcasting — Official Announcements
+  - 2.10.19 Support Center
+- 2.11 Competitor Analysis
+  - 2.11.1 Direct / Functional Competitors
+  - 2.11.2 Institutional & Platform Competitors
+  - 2.11.3 Competitive Advantages — Dash
+- 2.12 Future Features & Planned Improvements
+  - 2.12.1 New Platform Features
+  - 2.12.2 Technical Improvements
+  - 2.12.3 Administrative Improvements
+- 2.13 Contribution to Global Introduction & Conclusion
+
+---
+
+## Abbreviations & Acronyms
+
+| Abbreviation | Definition |
+|--------------|------------|
+| API | Application Programming Interface |
+| Auth | Authentication / Authorization |
+| CI/CD | Continuous Integration / Continuous Deployment |
+| CLI | Command Line Interface |
+| CPU | Central Processing Unit |
+| CRUD | Create, Read, Update, Delete |
+| CSR | Client-Side Rendering |
+| DB | Database |
+| DDoS | Distributed Denial of Service |
+| DNS | Domain Name System |
+| ERD | Entity Relationship Diagram |
+| HTTP/HTTPS | HyperText Transfer Protocol (Secure) |
+| IDE | Integrated Development Environment |
+| JWT | JSON Web Token |
+| MFA | Multi-Factor Authentication |
+| ORM | Object-Relational Mapping |
+| PWA | Progressive Web App |
+| RDBMS | Relational Database Management System |
+| RLS | Row-Level Security |
+| ROI | Return on Investment |
+| SaaS | Software as a Service |
+| SDK | Software Development Kit |
+| SEO | Search Engine Optimization |
+| SLA | Service Level Agreement |
+| SMTP | Simple Mail Transfer Protocol |
+| SQL | Structured Query Language |
+| SSG | Static Site Generation |
+| SSR | Server-Side Rendering |
+| UI | User Interface |
+| UML | Unified Modeling Language |
+| UX | User Experience |
+| WAF | Web Application Firewall |
+
+---
+
+## 2.1 Overview of the Solution
+
+Dash (Campus Connect) is a campus-oriented social and utility platform designed to centralize the digital life of university communities. The platform allows the School Administrator (the Main Admin — the person in charge of the school on the platform) to set up the institution's space, while students self-register and gain access after administrator approval. Once approved, students enjoy a unified suite of features including a social feed, events calendar, campus groups, marketplace, lost and found, direct messaging, and more — all within a verified, school-specific environment.
+
+### How the system works:
+
+1. The Main Admin (School Administrator) creates and configures the school's account and logs into the Admin Portal.
+2. A student creates their own account by entering their Student ID number, selecting their school, field of study, and level. The account immediately enters a pending state.
+3. The Main Admin reviews pending registrations in the Admin Portal and approves or rejects each one.
+4. Upon approval, the student is automatically assigned to three communities based on their field and level.
+5. The student signs in and is guided through an onboarding flow on first access, explaining the key features of the platform.
+6. The student lands on the Campus Feed and has access to all platform features.
+
+### 2.1.1 Primary Goals
+
+- Provide a modern web experience with strong UX for university communities.
+- Keep authentication secure while supporting a school-based onboarding workflow using Student IDs.
+- Ensure the platform can scale to multiple schools with controlled, role-based access.
+- Make the platform easy to maintain by a small development team.
+- Enable campus discovery, events, social interaction, marketplace, lost and found, and direct communication features in one place.
+- Implement field/level-based community structure for automatic student grouping.
+- Provide student admin capabilities for decentralized moderation.
+
+---
+
+## 2.2 Implementation — Development Tools & Technologies
+
+### 2.2.1 Development Environment
+
+**Visual Studio Code (VS Code)**
+VS Code is the primary code editor used for this project. It is lightweight, cross-platform, and widely adopted in the industry. It supports TypeScript/JavaScript development with IntelliSense and linting, Git integration for version control, and an integrated terminal for running scripts.
+
+**Node.js + npm**
+Node.js provides the JavaScript runtime for the development toolchain and the web build process. npm is used to manage all project dependencies and to execute build scripts.
+
+**Git — Version Control**
+Git is used throughout the project for team collaboration (feature branches and pull requests), tracking all code changes with the ability to roll back to stable versions, and managing releases and deployment readiness.
+
+### 2.2.2 Frontend — Web Application Layer
+
+**Next.js (React Framework)**
+Dash uses Next.js 16 as the core web application framework with the App Router. Key reasons for this choice include: a modern file-system-based routing system, server-side rendering (SSR) and static site generation (SSG) capabilities for performance, optimized bundling and code splitting, and an excellent developer experience.
+
+**React + TypeScript**
+React 19 provides a component-based UI development model that promotes reusable, maintainable code. TypeScript 5 is layered on top to add static type checking, reducing runtime errors and improving codebase maintainability.
+
+**Tailwind CSS + Component Library (shadcn/ui)**
+Tailwind CSS is used to rapidly build responsive interfaces using utility classes. The shadcn/ui component library provides accessible, pre-built base components (buttons, dialogs, inputs, dropdowns) that enforce consistent UI patterns.
+
+### 2.2.3 Backend Services & Database
+
+**Supabase (PostgreSQL + Auth + Storage + Realtime)**
+Supabase is used as the primary managed backend service providing:
+- PostgreSQL database: fully managed relational database for all application data
+- Authentication: secure account creation, session management, and user identity handling
+- Storage: cloud storage for user media including profile avatars and post attachments
+- Realtime: WebSocket-based live updates for notifications and messaging
+
+**Prisma (ORM & Schema Management)**
+Prisma 7 is used to define the database schema in a type-safe, declarative format and to generate a type-safe database client. It handles schema migrations, enforces consistent query patterns, and reduces the risk of SQL errors.
+
+### 2.2.4 Alternative & Reference Tools
+
+- **Vercel** for deployment and hosting
+- **pg** (PostgreSQL driver) for direct database connections
+- **Zod** for runtime data validation
+- **date-fns** for date formatting
+- **lucide-react** for icons
+
+---
+
+## 2.3 Hardware Resources
+
+### 2.3.1 Development Hardware — Minimum Recommendation
+
+- **CPU:** 4 cores minimum (8 cores preferred for faster build times)
+- **RAM:** 8 GB minimum (16 GB preferred for running multiple dev services)
+- **Storage:** SSD with at least 20–50 GB free space
+- **Network:** Stable internet connection for package installation and cloud connectivity
+
+### 2.3.2 Deployment Infrastructure — Production Target
+
+- **Web hosting:** Vercel with automatic SSL and global CDN
+- **Database & backend:** Supabase managed infrastructure (PostgreSQL, Auth, Storage, Realtime)
+- **CDN / Edge caching:** Vercel Edge Network for static assets
+- **Uptime target:** 98%+
+
+---
+
+## 2.4 Software Resources
+
+### 2.4.1 Core Software Components
+
+| Component | Technology |
+|-----------|------------|
+| Web Framework | Next.js 16 (React 19) |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS + shadcn/ui |
+| Database | Supabase PostgreSQL |
+| Auth & Sessions | Supabase Auth |
+| File Storage | Supabase Storage |
+| Realtime | Supabase Realtime |
+| ORM / Migrations | Prisma 7 |
+| Runtime & Tooling | Node.js + npm |
+| Version Control | Git |
+| Deployment | Vercel |
+
+### 2.4.2 Supporting Software — Operations
+
+- **Monitoring & logging:** Platform-level logs via Vercel and Supabase dashboards
+- **Security configuration:** Supabase Row-Level Security (RLS) policies, environment secrets management
+- **Backup strategy:** Automated Supabase database snapshots
+- **CI/CD pipeline:** Automated deployment triggered on Git push via Vercel + GitHub integration
+
+---
+
+## 2.5 Human Resources — Team Organization
+
+### 2.5.1 Communication Student — Communication & Documentation
+- Defines target audience, messaging strategy, and communication approach
+- Structures the report and ensures writing quality
+- Contributes to user-facing content: onboarding text, announcement templates
+
+### 2.5.2 Banking & Finance Student — Business Context & Viability
+- Contributes to business logic assumptions and financial feasibility analysis
+- Defines KPIs, sustainability metrics, and operational cost considerations
+- Assesses long-term ROI and platform sustainability
+
+### 2.5.3 Software Developer — Implementation & Technical Architecture
+- Designs the full system architecture, database schema, and API structure
+- Implements all frontend screens and backend API routes
+- Configures Supabase RLS policies, authentication workflows, and storage rules
+- Ensures code quality, manages testing, and handles deployment
+
+---
+
+## 2.6 Architecture of the Platform
+
+### 2.6.1 High-Level Architecture
+
+Dash follows a three-tier architecture:
+
+| Layer | Components & Responsibilities |
+|-------|-------------------------------|
+| Client Layer | Next.js app (UI rendering, routing). Manages auth sessions via Supabase SDK. |
+| Application Layer | Next.js route handlers (API endpoints). Prisma client for database queries. |
+| Data & Services Layer | Supabase Auth, PostgreSQL, Storage, Realtime |
+
+### 2.6.2 UML Diagrams
+
+**Use Case Diagram — Actors & Actions**
+
+- **Student:** Register (with field/level, pending approval), login, view/create posts, view/edit profile, search users/groups, join events, send messages, use marketplace, report lost/found items
+- **Student Admin:** View support tickets, approve/reject events, moderate flagged content, access admin console
+- **Main Admin (School Admin):** Manage school settings, create fields/levels, approve/reject registrations, assign student admins, broadcast announcements
+
+**Class Diagram — Core Domain Models**
+
+| Model | Key Attributes |
+|-------|----------------|
+| User | id, student_id, school_id, field_of_study_id, level_id, role, is_student_admin, approval_status |
+| School | id, name, domain, require_approval, admin_id |
+| FieldOfStudy | id, name, description, school_id |
+| Level | id, name, description, order, school_id |
+| Community | id, name, type (FIELD_ONLY/LEVEL_ONLY/FIELD_AND_LEVEL/STUDENT_CREATED), school_id, field_of_study_id, level_id, is_auto_assigned |
+| Post | id, author_id, content, images, audience, group_post_id, likes, comments |
+| Event | id, title, date, location, organizer_id, approval_status, attendees |
+| SupportTicket | id, user_id, title, description, category, priority, status |
+| MarketplaceListing | id, seller_id, brand_id, title, price, category, condition, status |
+| Brand | id, seller_id, name, description, logo |
+
+**Sequence Diagram — Student Registration & Admin Approval Flow**
+
+1. Student navigates to /register and selects university
+2. System fetches available fields and levels for the selected school
+3. Student enters Student ID, name, username, password, field of study, and level
+4. System creates account in PENDING state
+5. Student sees "Awaiting Approval" screen
+6. Main Admin reviews pending registrations in Admin Portal
+7. Admin clicks Approve
+8. System updates approval_status to APPROVED and assigns student to 3 communities
+9. Student signs in and completes onboarding
+10. Student lands on Campus Feed
+
+**Deployment Diagram**
+
+```
+Client Browser → Vercel CDN/Edge → Next.js (Vercel) → Supabase (Auth + PostgreSQL + Storage + Realtime)
+```
+
+---
+
+## 2.7 Security Strategy
+
+### 2.7.1 Authentication & Access Control
+- Secure account creation via Supabase Auth with hashed passwords
+- Session tokens managed server-side
+- Three roles: Student, Student Admin, Main Admin with scoped permissions
+- Admin Portal (/admin-portal) requires separate Main Admin login
+- Student Admin Console (/main/student-admin) restricted to isStudentAdmin users
+
+### 2.7.2 Database Security — Row-Level Security (RLS)
+- RLS enabled on all critical tables
+- Each user can only access authorized rows
+- Supabase service role key used exclusively in server-side routes
+
+### 2.7.3 Data Protection & Privacy
+- Only essential data collected: Student ID, name, field, level, password
+- No email required — Student ID is primary identifier
+- Admin Privacy Policy: admins cannot access private chats or personal messages
+- All moderation actions logged for audit
+
+### 2.7.4 Operational Security
+- All credentials stored in environment variables
+- Development and production environments kept separate
+- Least privilege principle enforced
+
+---
+
+## 2.8 Performance & Scalability
+
+### 2.8.1 Performance Considerations
+- Next.js Image component for optimized images
+- Code-splitting and lazy loading
+- Pagination on all large lists (feed, search, marketplace)
+- Database indexing on frequently queried fields
+
+### 2.8.2 Scalability Considerations
+- Multi-school architecture with school_id isolation
+- Supabase scales horizontally within plan limits
+- Vercel Edge Network for global content delivery
+
+---
+
+## 2.9 Testing Strategy
+
+### 2.9.1 Levels of Testing
+- **Unit tests:** Validation rules, utility functions
+- **Integration tests:** API routes, Prisma queries
+- **UI testing:** Key user flows (registration, approval, login, posting)
+
+### 2.9.2 Manual Test Plan
+1. Register a student with field/level selection → verify approval screen
+2. Admin approves registration → verify community assignment
+3. Student logs in → verify feed access
+4. Create post → verify appears in feed
+5. Create event → verify requires admin approval
+6. List marketplace item → verify appears correctly
+7. Submit support ticket → verify appears in My Tickets
+8. Student admin accesses panel → verify ticket/event/flag management
+
+---
+
+## 2.10 Pages of the Application
+
+### 2.10.1 Landing Page (Public)
+The landing page introduces Dash with the headline "Your campus, all in one place" and displays platform statistics. Two CTAs: "Join Your Campus" and "Sign In".
+
+### 2.10.2 Language Selection
+Users can select English or French before registering. Language can be changed anytime in profile settings.
+
+### 2.10.3 Student Registration — Join Dash
+Students register by selecting their university, entering Student ID, name, username, password, and selecting their field of study and level from dynamic dropdowns populated by the database.
+
+### 2.10.4 Awaiting Admin Approval
+After registration, students see a confirmation screen explaining the approval process and next steps.
+
+### 2.10.5 Admin Portal — Main Admin
+The Admin Portal (/admin-portal) provides:
+- Dashboard with metrics (students, pending approvals, flagged content, student admins)
+- Pending tab: approve/reject registrations
+- Students tab: manage enrolled students
+- Flagged tab: review reported content
+- School Settings tab: configure school details
+- Fields management page (/admin-portal/fields): CRUD for fields of study
+- Levels management page (/admin-portal/levels): CRUD for levels with reordering
+
+### 2.10.6 Student Login — Sign In
+Approved students log in with university selection, Student ID, and password.
+
+### 2.10.7 Onboarding — First-Time Users
+First-time users see a guided tour introducing the main features before landing on the feed.
+
+### 2.10.8 Campus Feed — Home / Main Feed
+The central hub showing posts from the school community, announcements, and group content. Tabs: Following, Trending, Peek. Channel filters available.
+
+### 2.10.9 Campus Events
+Events page with category filters and RSVP options. Events require admin approval before going live.
+
+### 2.10.10 Campus Groups
+Discover and join study groups, clubs, and organizations. Tabs: Discover, My Groups.
+
+### 2.10.11 Campus Marketplace
+Buy, sell, and trade items within the school community. Category filters and seller contact via messaging.
+
+### 2.10.12 Lost & Found
+Report and recover lost items. Tabs: Lost, Found, Resolved.
+
+### 2.10.13 Search
+Find people and groups within the campus. Tabs: People, Groups.
+
+### 2.10.14 Messages — Direct Messaging
+Private messaging between students. School-scoped for security.
+
+### 2.10.15 Student Profile
+Public profile showing posts, media, saved content, and settings. Editable fields: academic field, interests, bio.
+
+### 2.10.16 Notifications
+Aggregated activity feed with tabs: All, Announcements, Activity. Customizable notification preferences.
+
+### 2.10.17 In-App Admin Console — Student Admin
+Moderation dashboard at /main/student-admin showing:
+- Support tickets to manage
+- Pending events to approve/reject
+- Flagged content to review
+- Stats overview
+
+### 2.10.18 Campus Broadcasting — Official Announcements
+Admins can compose and broadcast announcements to all students or specific groups. AI assistant available for optimization.
+
+### 2.10.19 Support Center
+Students can submit support tickets in categories: Tech Support, Report Behavior, General Inquiry. Track ticket status in My Tickets.
+
+---
+
+## 2.11 Competitor Analysis
+
+### 2.11.1 Direct / Functional Competitors
+- **WhatsApp/Telegram:** Fast but unstructured, no verification or moderation
+- **Discord:** Strong community features but no school-native identity
+- **Facebook Groups:** Wide adoption but privacy concerns, no student ID verification
+
+### 2.11.2 Institutional & Platform Competitors
+- **School Portals/LMS:** Academic focus, not designed for social life
+- **LinkedIn:** Professional networking, not for informal campus interactions
+
+### 2.11.3 Competitive Advantages — Dash
+| Advantage | Description |
+|-----------|-------------|
+| Verified student identity | Student ID + admin approval ensures real enrolled students |
+| Field/Level communities | Automatic grouping by academic program and year |
+| Multi-school architecture | Each school has isolated, scoped environment |
+| Integrated feature suite | Feed, events, marketplace, lost & found, messaging in one app |
+| Admin control layer | Full oversight of registrations, content, and moderation |
+| Student admin capabilities | Decentralized moderation by trusted students |
+| AI-assisted tools | AI-powered announcement composition |
+
+---
+
+## 2.12 Future Features & Planned Improvements
+
+### 2.12.1 New Platform Features
+- Push notifications (browser and mobile)
+- Native mobile application (React Native/Expo)
+- Academic calendar integration
+- Course reviews & ratings
+- Campus polls & voting
+- Stories (24-hour content)
+- Campus radio/live streaming
+
+### 2.12.2 Technical Improvements
+- Full realtime messaging with typing indicators and read receipts
+- Automated AI content moderation
+- Advanced full-text search across all entities
+- Admin analytics dashboard
+- Expanded language support
+- PWA offline support
+- Third-party integrations (university systems)
+
+### 2.12.3 Administrative Improvements
+- Bulk approval of registrations
+- Customizable onboarding per school
+- Granular admin roles (Department Admin, Event Moderator, etc.)
+- Full audit logs
+- Automated student verification via university databases
+
+---
+
+## 2.13 Contribution to Global Introduction & Conclusion
+
+### Introduction (Technical Contribution)
+This report presents the design and implementation of Dash (Campus Connect), a modern web platform built to improve communication, engagement, and daily utility within university communities. The solution provides a secure and verified environment where students register under their school using their Student ID number, select their field of study and academic level, await administrator approval, and then gain access to a rich set of campus features. Upon approval, students are automatically assigned to field-based, level-based, and combined communities. The platform includes a social feed, events calendar, campus groups, peer-to-peer marketplace, lost and found, direct messaging, and official announcements — all within a single, institution-scoped platform. Student admins provide decentralized moderation capabilities for support tickets, event approvals, and content flagging.
+
+### Conclusion (Technical Contribution)
+The technical implementation of Dash demonstrates that a scalable, feature-rich, and institution-verified campus platform can be built efficiently using modern web frameworks and managed cloud services. By combining a responsive Next.js frontend with a secure Supabase backend — encompassing authentication, database, storage, and realtime services — and enforcing clear role-based access rules at every level, the solution provides a solid foundation for multi-school adoption. The field/level-based community structure enables automatic student grouping without manual intervention. Future improvements including native mobile applications, full realtime messaging, push notifications, automated content moderation, and advanced analytics will further increase student engagement and operational efficiency across university communities.

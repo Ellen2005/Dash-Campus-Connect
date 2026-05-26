@@ -24,6 +24,7 @@ interface PostCardProps {
   author: { name: string; username: string; avatar: string; isVerified?: boolean; flair?: string; };
   content: string;
   image?: string;
+  actionUrl?: string;
   timestamp: string;
   score: number;
   comments: number;
@@ -31,19 +32,13 @@ interface PostCardProps {
   channel?: string;
 }
 
-const mockComments = [
-  { id: "c1", author: { name: "Sarah Chen", username: "schen_bio", avatar: "https://picsum.photos/seed/sarah/40/40" }, content: "Thanks for sharing! This really helped.", timestamp: "2h ago", likes: 3 },
-  { id: "c2", author: { name: "Mike Johnson", username: "mjohnson_cs", avatar: "https://picsum.photos/seed/mike/40/40" }, content: "Have you tried the new study rooms in the library?", timestamp: "1h ago", likes: 1 },
-];
-
-export function PostCard({ id = "post", author, content, image, timestamp, score, comments, isAnnouncement, channel }: PostCardProps) {
+export function PostCard({ id = "post", author, content, image, actionUrl, timestamp, score, comments, isAnnouncement, channel }: PostCardProps) {
   const { t } = useI18n();
   const [vote, setVote] = useState<"up" | "down" | "none">("none");
   const [summary, setSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
-  const [commentLikes, setCommentLikes] = useState<Record<string, number>>({ c1: 3, c2: 1 });
   const [saved, setSaved] = useState(false);
   const [anon, setAnon] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -168,6 +163,28 @@ export function PostCard({ id = "post", author, content, image, timestamp, score
               <img src={image} alt="Post media" className="w-full h-auto object-cover max-h-96 transition-transform duration-300 hover:scale-[1.01]" loading="lazy" />
             </div>
           )}
+
+          {isAnnouncement && actionUrl && (
+            <div className="rounded-lg overflow-hidden border border-border/50 bg-background">
+              {/\.(png|jpe?g|gif|webp)$/i.test(actionUrl) ? (
+                <img
+                  src={actionUrl}
+                  alt="Announcement attachment"
+                  className="w-full h-auto object-cover max-h-96 transition-transform duration-300 hover:scale-[1.01]"
+                  loading="lazy"
+                />
+              ) : (
+                <a
+                  href={actionUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block px-3 py-2 text-sm font-semibold text-primary hover:opacity-90 transition-opacity"
+                >
+                  View attachment
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -226,32 +243,9 @@ export function PostCard({ id = "post", author, content, image, timestamp, score
                   </Button>
                 </div>
               </div>
-              {mockComments.map((c, i) => (
-                <div key={c.id} className="flex gap-2 animate-in fade-in duration-150" style={{ animationDelay: `${i * 40}ms` }}>
-                  <Avatar className="w-7 h-7 shrink-0">
-                    <AvatarImage src={c.author.avatar} />
-                    <AvatarFallback className="text-[10px]">{c.author.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 bg-muted/30 rounded-lg px-3 py-2 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold">{c.author.name}</span>
-                      <span className="text-[10px] text-muted-foreground">{c.timestamp}</span>
-                    </div>
-                    <p className="text-xs text-foreground/85">{c.content}</p>
-                    <div className="flex items-center gap-3">
-                      <button
-                        className="text-[10px] text-muted-foreground hover:text-primary transition-colors font-medium"
-                        onClick={() => setCommentLikes(l => ({ ...l, [c.id]: (l[c.id] ?? c.likes) + 1 }))}
-                      >
-                        {t("like")} ({commentLikes[c.id] ?? c.likes})
-                      </button>
-                      <button className="text-[10px] text-muted-foreground hover:text-primary transition-colors font-medium">
-                        {t("reply")}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              <div className="text-[11px] text-muted-foreground">
+                Real comments are not currently wired into this UI. Your comment input is ready, but comment history will appear once the comments API is connected.
+              </div>
             </CollapsibleContent>
           </Collapsible>
 

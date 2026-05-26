@@ -17,6 +17,7 @@ const CreateEventSchema = z.object({
   groupId: z.string().optional(),
   isFree: z.boolean().default(true),
   ticketPrice: z.number().positive().optional(),
+  bannerImageUrl: z.string().url().optional(),
 })
 
 export async function GET(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('isFree') === 'true' ? true : searchParams.get('isFree') === 'false' ? false : undefined
     const search = searchParams.get('search')
 
-    let where: any = {}
+    let where: any = { approvalStatus: 'APPROVED' }
 
     // Date filtering
     const now = new Date()
@@ -100,7 +101,10 @@ export async function GET(request: NextRequest) {
     const total = await prisma.event.count({ where })
 
     return NextResponse.json({
-      events,
+      events: events.map((event) => ({
+        ...event,
+        bannerImageUrl: event.qrCheckIn || null,
+      })),
       pagination: {
         page,
         limit,
@@ -133,6 +137,8 @@ export async function POST(request: NextRequest) {
         groupId: eventData.groupId,
         isFree: eventData.isFree,
         ticketPrice: eventData.ticketPrice,
+      approvalStatus: 'PENDING',
+        qrCheckIn: eventData.bannerImageUrl,
       },
       include: {
         organizer: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,16 +14,9 @@ import { DashLogo } from "@/components/shared/dash-logo";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 
-const SCHOOLS = [
-  { id: "uyd",   name: "University of Yaoundé I",  code: "UYD" },
-  { id: "ubuea", name: "University of Buea",        code: "UBa" },
-  { id: "demo",  name: "Demo University",           code: "DEMO" },
-];
-
-const FACULTIES = [
-  "Engineering", "Science", "Arts & Humanities",
-  "Business", "Medicine", "Law", "Education",
-];
+type School = { id: string; name: string };
+type FieldOfStudy = { id: string; name: string; description: string | null };
+type Level = { id: string; name: string; description: string | null; order: number };
 
 function validateStudentId(id: string): string | null {
   if (!id.trim()) return "Student ID is required.";
@@ -47,6 +40,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(true);
 
   const [form, setForm] = useState({
     schoolId: "",
@@ -55,13 +50,66 @@ export default function RegisterPage() {
     username: "",
     password: "",
     confirmPassword: "",
-    faculty: "",
-    year: "",
+    fieldOfStudyId: "",
+    levelId: "",
     agreed: false,
   });
 
+  const [fields, setFields] = useState<FieldOfStudy[]>([]);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [levelsLoading, setLevelsLoading] = useState(false);
+
   const set = (key: keyof typeof form) => (val: string | boolean) =>
     setForm(f => ({ ...f, [key]: val }));
+
+  // Fetch fields when school is selected
+  useEffect(() => {
+    if (!form.schoolId) {
+      setFields([]);
+      return;
+    }
+    setFieldsLoading(true);
+    fetch(`/api/schools/${encodeURIComponent(form.schoolId)}/fields`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((json) => {
+        if (Array.isArray(json?.fields)) setFields(json.fields);
+        else setFields([]);
+      })
+      .catch(() => setFields([]))
+      .finally(() => setFieldsLoading(false));
+  }, [form.schoolId]);
+
+  // Fetch levels when school is selected
+  useEffect(() => {
+    if (!form.schoolId) {
+      setLevels([]);
+      return;
+    }
+    setLevelsLoading(true);
+    fetch(`/api/schools/${encodeURIComponent(form.schoolId)}/levels`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((json) => {
+        if (Array.isArray(json?.levels)) setLevels(json.levels);
+        else setLevels([]);
+      })
+      .catch(() => setLevels([]))
+      .finally(() => setLevelsLoading(false));
+  }, [form.schoolId]);
+
+  useEffect(() => {
+    const run = async () => {
+      setSchoolsLoading(true);
+      try {
+        const res = await fetch("/api/schools", { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (res.ok && Array.isArray(json?.schools)) setSchools(json.schools);
+      } finally {
+        setSchoolsLoading(false);
+      }
+    };
+    run();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,19 +122,19 @@ export default function RegisterPage() {
     if (form.username.trim().length < 3) { setError("Username must be at least 3 characters."); return; }
     const pwErr = validatePassword(form.password, form.confirmPassword);
     if (pwErr)                   { setError(pwErr); return; }
-    if (!form.faculty)           { setError("Please select your faculty."); return; }
-    if (!form.year)              { setError("Please select your year of study."); return; }
+    if (!form.fieldOfStudyId)    { setError("Please select your field of study."); return; }
+    if (!form.levelId)           { setError("Please select your level."); return; }
 
     setLoading(true);
     try {
       const { error: authError } = await signUp({
-        studentId:  form.studentId.trim().toUpperCase(),
-        schoolId:   form.schoolId,
-        password:   form.password,
-        fullName:   form.fullName.trim(),
-        username:   form.username.trim().toLowerCase().replace(/\s/g, "_"),
-        faculty:    form.faculty,
-        year:       form.year,
+        studentId:     form.studentId.trim().toUpperCase(),
+        schoolId:      form.schoolId,
+        password:      form.password,
+        fullName:      form.fullName.trim(),
+        username:      form.username.trim().toLowerCase().replace(/\s/g, "_"),
+        fieldOfStudyId: form.fieldOfStudyId,
+        levelId:       form.levelId,
       });
 
       if (authError) {
@@ -190,7 +238,7 @@ export default function RegisterPage() {
                   <SelectValue placeholder={t("selectUniversity")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCHOOLS.map(s => (
+                  {schools.map(s => (
                     <SelectItem key={s.id} value={s.id}>
                       <div className="flex items-center gap-2">
                         <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
@@ -200,6 +248,9 @@ export default function RegisterPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {schoolsLoading && (
+                <p className="text-[10px] text-muted-foreground">Loading schools…</p>
+              )}
             </div>
 
             {/* Student ID */}
@@ -305,35 +356,49 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Faculty + Year */}
+            {/* Field of Study + Level */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
-                  {t("faculty")}
+                  Field of Study
                 </Label>
-                <Select onValueChange={set("faculty")} required>
+                <Select onValueChange={set("fieldOfStudyId")} required disabled={fieldsLoading}>
                   <SelectTrigger className="h-10 text-sm bg-muted/30">
-                    <SelectValue placeholder="Select…" />
+                    <SelectValue placeholder={fieldsLoading ? "Loading…" : "Select field…"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {FACULTIES.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
-                  {t("yearOfStudy")}
-                </Label>
-                <Select onValueChange={set("year")} required>
-                  <SelectTrigger className="h-10 text-sm bg-muted/30">
-                    <SelectValue placeholder="Year…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[1,2,3,4,5,6,7].map(y => (
-                      <SelectItem key={y} value={String(y)}>Year {y}</SelectItem>
+                    {fields.map(f => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {fields.length === 0 && !fieldsLoading && form.schoolId && (
+                  <p className="text-[10px] text-muted-foreground">No fields available for this school.</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">
+                  Level / Year
+                </Label>
+                <Select onValueChange={set("levelId")} required disabled={levelsLoading}>
+                  <SelectTrigger className="h-10 text-sm bg-muted/30">
+                    <SelectValue placeholder={levelsLoading ? "Loading…" : "Select level…"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {levels
+                      .sort((a, b) => a.order - b.order)
+                      .map(l => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {levels.length === 0 && !levelsLoading && form.schoolId && (
+                  <p className="text-[10px] text-muted-foreground">No levels available for this school.</p>
+                )}
               </div>
             </div>
 

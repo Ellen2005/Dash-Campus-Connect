@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Megaphone, Send, ShieldAlert, CheckCircle2, Loader2, Users, AtSign, X, Globe, Lock } from "lucide-react";
+import { Sparkles, Megaphone, Send, ShieldAlert, CheckCircle2, Loader2, AtSign, X, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
+import { uploadFile } from "@/lib/upload";
 
 interface AISuggestion {
   suggestedTitle: string;
@@ -30,23 +32,11 @@ function mockAnnouncementAssistant(draft: string): AISuggestion {
   };
 }
 
-const COMMUNITIES = [
-  { value: "all",       label: "All Students",          icon: Globe },
-  { value: "cs26",      label: "Computer Science '26",  icon: Users },
-  { value: "wstem",     label: "Women in STEM",         icon: Users },
-  { value: "eng",       label: "Engineering Faculty",   icon: Users },
-  { value: "med",       label: "Medicine Faculty",      icon: Users },
-  { value: "year1",     label: "Year 1 Students",       icon: Users },
-  { value: "year4",     label: "Year 4 Students",       icon: Users },
-  { value: "specific",  label: "Specific Students (Tag)", icon: AtSign },
-];
+type StudentTag = { id: string; name: string; username: string };
 
-const MOCK_STUDENTS = [
-  { id: "s1", name: "Alex Rivera",  username: "arivera_comp" },
-  { id: "s2", name: "Sarah Chen",   username: "schen_bio" },
-  { id: "s3", name: "Jordan Lee",   username: "jlee_arts" },
-  { id: "s4", name: "Mike Johnson", username: "mjohnson_cs" },
-  { id: "s5", name: "Priya Sharma", username: "priya_med" },
+const COMMUNITIES = [
+  { value: "all",      label: "All Students",         icon: Globe },
+  { value: "specific", label: "Specific Students",  icon: AtSign },
 ];
 
 export default function AdminAnnouncementsPage() {
@@ -58,20 +48,51 @@ export default function AdminAnnouncementsPage() {
   const [audience, setAudience] = useState("all");
   const [expiry, setExpiry] = useState("24h");
   const [tagSearch, setTagSearch] = useState("");
-  const [taggedStudents, setTaggedStudents] = useState<typeof MOCK_STUDENTS>([]);
+  const [students, setStudents] = useState<StudentTag[]>([]);
+  const [taggedStudents, setTaggedStudents] = useState<StudentTag[]>([]);
+  const [sending, setSending] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentLink, setAttachmentLink] = useState("");
+
+  const { dashUser, session } = useAuth();
+
+  useEffect(() => {
+    const run = async () => {
+      if (!dashUser) return;
+      try {
+        const res = await fetch("/api/admin/users?status=active", { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok || !Array.isArray(json?.users)) return setStudents([]);
+
+        const next: StudentTag[] = json.users
+          .map((u: any) => ({
+            id: u.id,
+            name: u.name ?? u.username ?? "Student",
+            username: u.username ?? "",
+          }))
+          .filter((u: StudentTag) => !!u.id && !!u.username);
+        setStudents(next);
+      } catch {
+        setStudents([]);
+      }
+    };
+    void run();
+  }, [dashUser?.id, session]);
 
   const isSpecific = audience === "specific";
-  const filteredStudents = MOCK_STUDENTS.filter(s =>
-    (s.name.toLowerCase().includes(tagSearch.toLowerCase()) || s.username.toLowerCase().includes(tagSearch.toLowerCase())) &&
-    !taggedStudents.find(t => t.id === s.id)
+  const filteredStudents = students.filter(
+    (s) =>
+      (s.name.toLowerCase().includes(tagSearch.toLowerCase()) ||
+        s.username.toLowerCase().includes(tagSearch.toLowerCase())) &&
+      !taggedStudents.find((t) => t.id === s.id)
   );
 
-  const addTag = (s: typeof MOCK_STUDENTS[0]) => {
-    setTaggedStudents(prev => [...prev, s]);
+  const addTag = (s: StudentTag) => {
+    setTaggedStudents((prev) => [...prev, s]);
     setTagSearch("");
   };
 
-  const removeTag = (id: string) => setTaggedStudents(prev => prev.filter(s => s.id !== id));
+  const removeTag = (id: string) => setTaggedStudents((prev) => prev.filter((s) => s.id !== id));
 
   const handleGenerate = async () => {
     if (!draft.trim()) return;
@@ -93,12 +114,57 @@ export default function AdminAnnouncementsPage() {
     }
   };
 
-  const handleSend = () => {
-    const target = isSpecific
-      ? taggedStudents.map(s => `@${s.username}`).join(", ")
-      : COMMUNITIES.find(c => c.value === audience)?.label ?? "All Students";
-    toast({ title: "Announcement Sent ✅", description: `Broadcast to: ${target}` });
-    setDraft(""); setSuggestion(null); setContext(""); setTaggedStudents([]);
+  const handleSend = async () => {
+    const message = (suggestion?.revisedMessage ?? draft).trim();
+    if (!message) return;
+
+    setSending(true);
+    try {
+      let actionUrl: string | undefined;
+      if (attachmentFile) {
+        if (!dashUser) throw new Error("Sign in required to upload attachments.");
+        const uploaded = await uploadFile(attachmentFile, "posts", dashUser.id);
+        if (uploaded.error || !uploaded.url) throw new Error(uploaded.error ?? "Attachment upload failed.");
+        actionUrl = uploaded.url;
+      } else if (attachmentLink.trim()) {
+        const raw = attachmentLink.trim();
+        actionUrl = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+      }
+
+      const title = (suggestion?.suggestedTitle ?? "School Announcement").trim().slice(0, 200);
+      const targetUserIds = isSpecific ? taggedStudents.map((s) => s.id) : undefined;
+      const payload = {
+        title,
+        message: message.slice(0, 500),
+        actionUrl,
+        targetUserIds: targetUserIds && targetUserIds.length > 0 ? targetUserIds : undefined,
+      };
+
+      const res = await fetch("/api/admin/broadcast", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error ?? "Broadcast failed.");
+
+      toast({
+        title: "Announcement Sent ✅",
+        description: `Delivered to ${json?.delivered ?? 0} students.`,
+      });
+
+      setDraft("");
+      setSuggestion(null);
+      setContext("");
+      setTaggedStudents([]);
+      setAttachmentFile(null);
+      setAttachmentLink("");
+      setExpiry("24h");
+    } catch (e: any) {
+      toast({ title: "Broadcast failed", description: e?.message ?? "Please try again." });
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -188,6 +254,33 @@ export default function AdminAnnouncementsPage() {
             <Input placeholder="e.g. For final year students only" className="h-9 text-sm bg-muted/30" value={context} onChange={e => setContext(e.target.value)} />
           </div>
 
+          <div className="space-y-1.5">
+            <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Attachment (Optional)</Label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <label className="dash-card p-3.5 flex items-center justify-between gap-3 rounded-xl border border-border/50 cursor-pointer hover:border-primary/30 transition-colors">
+                <span className="text-[11px] font-semibold text-muted-foreground">
+                  {attachmentFile ? attachmentFile.name : "Upload PDF/Image"}
+                </span>
+                <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Choose</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => {
+                    setAttachmentFile(e.target.files?.[0] ?? null);
+                  }}
+                />
+              </label>
+
+              <Input
+                value={attachmentLink}
+                onChange={(e) => setAttachmentLink(e.target.value)}
+                placeholder="Or paste a link (https://...)"
+                className="h-11 bg-muted/30 border-border"
+              />
+            </div>
+          </div>
+
           <Button className="w-full dash-button-primary" onClick={handleGenerate} disabled={isAiLoading || !draft.trim()}>
             {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
             {isAiLoading ? "Processing with AI…" : "Optimize with AI Assistant"}
@@ -255,8 +348,10 @@ export default function AdminAnnouncementsPage() {
 
             <div className="flex gap-3 pt-3 border-t border-border">
               <Button variant="outline" className="flex-1" onClick={() => setSuggestion(null)}>Discard</Button>
-              <Button className="flex-1 dash-button-primary" onClick={handleSend}
-                disabled={isSpecific && taggedStudents.length === 0}>
+              <Button
+                className="flex-1 dash-button-primary"
+                onClick={() => void handleSend()}
+                disabled={sending || (isSpecific && taggedStudents.length === 0)}>
                 <Send className="w-4 h-4 mr-2" /> Broadcast Announcement
               </Button>
             </div>

@@ -20,8 +20,15 @@ model User {
   bio                   String?         @db.Text
   profilePhoto          String?
   coverPhoto            String?
-  major                 String?
-  year                  String?         // e.g., "2026", "Grad"
+  
+  // School & Academic Info
+  schoolId              String?
+  school                School?         @relation("SchoolStudents", fields: [schoolId], references: [id])
+  fieldOfStudyId        String?
+  fieldOfStudy          FieldOfStudy?   @relation(fields: [fieldOfStudyId], references: [id])
+  levelId               String?
+  level                 Level?          @relation(fields: [levelId], references: [id])
+  
   interests             String[]        @default([]) // Stored as JSONB
   phone                 String?
   secondaryEmail        String?
@@ -32,8 +39,12 @@ model User {
   onlyFriendsCanSeePosts Boolean        @default(false)
   hideFromMarketplace   Boolean         @default(false)
   
-  // Roles
+  // Account Status
   role                  Role            @default(USER)
+  isStudentAdmin        Boolean         @default(false)
+  approvalStatus        ApprovalStatus  @default(PENDING)
+  approvalRejectedReason String?
+  
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -51,10 +62,27 @@ model User {
   messages              Message[]
   mentionedIn           Mention[]
   createdGroups         Group[]         @relation("groupCreator")
+  communityMemberships  CommunityMember[] @relation("user")
+  createdCommunities    Community[]     @relation("communityCreator")
+  brands                Brand[]
+  orders                Order[]
+  shoppingCart          ShoppingCart?
+  supportTickets        SupportTicket[]
+  adminChatMessages     AdminChatMessage[]
 
   @@index([email])
   @@index([username])
+  @@index([schoolId])
+  @@index([fieldOfStudyId])
+  @@index([levelId])
+  @@index([approvalStatus])
   @@index([createdAt])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum Role {
@@ -64,7 +92,374 @@ enum Role {
   SUPER_ADMIN
 }
 
-// ============= Social Features =============
+// ============= Schools & Admin Portal =============
+model School {
+  id              String              @id @default(cuid())
+  name            String
+  country         String?
+  allowedDomain   String?
+  requireApproval Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  admin           AdminAccount?
+  students        User[]              @relation("SchoolStudents")
+  fieldsOfStudy   FieldOfStudy[]
+  levels          Level[]
+  communities     Community[]
+
+  @@index([createdAt])
+}
+
+model FieldOfStudy {
+  id              String              @id @default(cuid())
+  name            String              // e.g., "Engineering", "Medicine"
+  description     String?             @db.Text
+  school          School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId        String
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  students        User[]
+  communities     Community[]         @relation("FieldCommunities")
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+model Level {
+  id              String              @id @default(cuid())
+  name            String              // e.g., "Level 1", "Level 2"
+  description     String?             @db.Text
+  order           Int                 @default(0)
+  school          School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId        String
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  students        User[]
+  communities     Community[]         @relation("LevelCommunities")
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([order])
+}
+
+enum AdminRole {
+  OWNER
+}
+
+model AdminAccount {
+  id           String    @id @default(cuid())
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId     String    @unique
+  name         String
+  passwordHash String
+  role         AdminRole @default(OWNER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions     AdminSession[]
+}
+
+model AdminSession {
+  id        String       @id @default(cuid())
+  admin     AdminAccount @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId   String
+  tokenHash String       @unique
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+
+  @@index([adminId])
+  @@index([expiresAt])
+}
+
+// ============= Communities & Groups =============
+model Community {
+  id                  String              @id @default(cuid())
+  name                String
+  description         String?             @db.Text
+  photo               String?
+  type                CommunityType       @default(STUDENT_CREATED)
+  
+  school              School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId            String
+  
+  // For auto-assigned communities
+  fieldOfStudy        FieldOfStudy?       @relation("FieldCommunities", fields: [fieldOfStudyId], references: [id], onDelete: SetNull)
+  fieldOfStudyId      String?
+  
+  level               Level?              @relation("LevelCommunities", fields: [levelId], references: [id], onDelete: SetNull)
+  levelId             String?
+  
+  // Auto-assigned: true for field-only, level-only, or field+level communities
+  isAutoAssigned      Boolean             @default(false)
+  
+  creator             User?               @relation("communityCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  creatorId           String?
+  
+  members             CommunityMember[]
+  posts               CommunityPost[]
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([schoolId, fieldOfStudyId, levelId])
+  @@index([schoolId])
+  @@index([fieldOfStudyId])
+  @@index([levelId])
+  @@index([type])
+}
+
+enum CommunityType {
+  FIELD_ONLY            // All students in field X
+  LEVEL_ONLY            // All students in level Y
+  FIELD_AND_LEVEL      // Students in field X and level Y
+  STUDENT_CREATED      // User-created communities
+}
+
+model CommunityMember {
+  id              String          @id @default(cuid())
+  user            User            @relation("user", fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  community       Community       @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  communityId     String
+  role            CommunityRole   @default(MEMBER)
+  joinedAt        DateTime        @default(now())
+  
+  @@unique([userId, communityId])
+  @@index([communityId])
+}
+
+enum CommunityRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+model CommunityPost {
+  id              String          @id @default(cuid())
+  content         String          @db.Text
+  community       Community       @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  communityId     String
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([communityId])
+  @@index([createdAt])
+}
+
+// ============= Marketplace - Brands & Orders =============
+model Brand {
+  id              String              @id @default(cuid())
+  name            String
+  description     String?             @db.Text
+  logo            String?
+  seller          User                @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerId        String
+  
+  listings        MarketplaceListing[]
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([sellerId])
+}
+
+model ShoppingCart {
+  id              String              @id @default(cuid())
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String              @unique
+  items           CartItem[]
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([userId])
+}
+
+model CartItem {
+  id              String              @id @default(cuid())
+  cart            ShoppingCart        @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId          String
+  listing         MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId       String
+  quantity        Int                 @default(1)
+  
+  @@unique([cartId, listingId])
+  @@index([cartId])
+}
+
+model Order {
+  id              String              @id @default(cuid())
+  buyer           User                @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId         String
+  items           OrderItem[]
+  
+  totalPrice      Float
+  status          OrderStatus         @default(PENDING)
+  paymentMethod   PaymentMethod       @default(MOBILE_MONEY)
+  paymentStatus   PaymentStatus       @default(PENDING)
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([buyerId])
+  @@index([status])
+}
+
+model OrderItem {
+  id              String              @id @default(cuid())
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId         String
+  listing         MarketplaceListing  @relation(fields: [listingId], references: [id])
+  listingId       String
+  quantity        Int
+  pricePerUnit    Float
+  
+  @@index([orderId])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentMethod {
+  MOBILE_MONEY
+  ORANGE_MONEY
+}
+
+// ============= Support System =============
+model SupportTicket {
+  id              String              @id @default(cuid())
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  
+  title           String
+  description     String              @db.Text
+  category        TicketCategory
+  priority        TicketPriority      @default(NORMAL)
+  status          TicketStatus        @default(OPEN)
+  
+  messages        TicketMessage[]
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  resolvedAt      DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TicketMessage {
+  id              String              @id @default(cuid())
+  ticket          SupportTicket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId        String
+  
+  content         String              @db.Text
+  attachments     String[]            @default([])
+  
+  createdAt       DateTime            @default(now())
+
+  @@index([ticketId])
+}
+
+enum TicketCategory {
+  TECHNICAL
+  BEHAVIORAL
+  INQUIRY
+  BUG_REPORT
+  FEATURE_REQUEST
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  RESOLVED
+  CLOSED
+}
+
+// ============= Announcements =============
+model Announcement {
+  id              String              @id @default(cuid())
+  title           String
+  content         String              @db.Text
+  
+  status          AnnouncementStatus  @default(PENDING)
+  priority        AnnouncementPriority @default(NORMAL)
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  publishedAt     DateTime?
+
+  @@index([status])
+  @@index([priority])
+  @@index([publishedAt])
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AnnouncementPriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+// ============= Admin Chat =============
+model AdminChatGroup {
+  id              String              @id @default(cuid())
+  name            String              @default("Admin Channel")
+  messages        AdminChatMessage[]
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+model AdminChatMessage {
+  id              String              @id @default(cuid())
+  chatGroup       AdminChatGroup      @relation(fields: [chatGroupId], references: [id], onDelete: Cascade)
+  chatGroupId     String
+  
+  sender          User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId        String
+  
+  content         String              @db.Text
+  attachments     String[]            @default([])
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([chatGroupId])
+  @@index([senderId])
+}
+
+
 model Follow {
   id          String   @id @default(cuid())
   follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
@@ -278,40 +673,50 @@ model ChatGroup {
 
 // ============= Events =============
 model Event {
-  id          String        @id @default(cuid())
-  title       String
-  description String?       @db.Text
-  date        DateTime
-  endDate     DateTime?
-  location    String
+  id                  String          @id @default(cuid())
+  title               String
+  description         String?         @db.Text
+  date                DateTime
+  endDate             DateTime?
+  location            String
   
   // Map coordinates
-  latitude    Float?
-  longitude   Float?
+  latitude            Float?
+  longitude           Float?
   
-  capacity    Int?
+  capacity            Int?
   
-  organizer   User          @relation(fields: [organizerId], references: [id], onDelete: Cascade)
-  organizerId String
+  organizer           User            @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  organizerId         String
   
-  group       Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  groupId     String?
+  group               Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  groupId             String?
   
-  attendees   EventAttendee[]
+  attendees           EventAttendee[]
   
-  isRecurring Boolean       @default(false)
-  recurrencePattern String? // e.g., "WEEKLY"
+  isRecurring         Boolean         @default(false)
+  recurrencePattern   String?         // e.g., "WEEKLY"
   
-  isFree      Boolean       @default(true)
-  ticketPrice Float?
+  isFree              Boolean         @default(true)
+  ticketPrice         Float?
   
-  qrCheckIn   String?
+  qrCheckIn           String?
   
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  // Approval workflow
+  approvalStatus      EventApprovalStatus @default(PENDING)
+  
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@index([organizerId])
   @@index([date])
+  @@index([approvalStatus])
+}
+
+enum EventApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model EventAttendee {
@@ -337,35 +742,41 @@ enum RSVPStatus {
 
 // ============= Marketplace =============
 model MarketplaceListing {
-  id          String      @id @default(cuid())
-  title       String
-  description String      @db.Text
-  seller      User        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  sellerId    String
+  id              String      @id @default(cuid())
+  title           String
+  description     String      @db.Text
+  seller          User        @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerId        String
   
-  category    MarketplaceCategory
-  condition   Condition
+  brand           Brand?      @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brandId         String?
   
-  price       Float?
-  isFree      Boolean     @default(false)
-  isTradeOnly Boolean     @default(false)
+  category        MarketplaceCategory
+  condition       Condition
   
-  images      String[]    @default([])
+  price           Float?
+  isFree          Boolean     @default(false)
+  isTradeOnly     Boolean     @default(false)
+  
+  images          String[]    @default([])
   
   preferredContact String? // "chat", "phone", "email"
   
-  status      ListingStatus @default(ACTIVE)
-  expiresAt   DateTime?
+  status          ListingStatus @default(ACTIVE)
+  expiresAt       DateTime?
   
-  isFlagged   Boolean     @default(false)
-  flags       ModeratorFlag[]
+  isFlagged       Boolean     @default(false)
+  flags           ModeratorFlag[]
   
-  reviews     Review[]
+  reviews         Review[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
   
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@index([sellerId])
+  @@index([brandId])
   @@index([category])
   @@index([status])
 }

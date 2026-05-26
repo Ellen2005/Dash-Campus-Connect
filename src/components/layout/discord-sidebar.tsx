@@ -3,12 +3,13 @@
 import { cn } from "@/lib/utils";
 import {
   Hash, Settings, Plus, Shield, Megaphone,
-  ShoppingBag, Search, BookOpen, LifeBuoy, Users, Bell
+  ShoppingBag, Search, BookOpen, LifeBuoy, Users, Bell, MessageCircle
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { DashLogo } from "@/components/shared/dash-logo";
+import { useAuth } from "@/lib/auth-context";
 
 const communities = [
   { id: "home", label: "CG",  href: "/main" },
@@ -19,6 +20,9 @@ const communities = [
 
 export function ServerSidebar() {
   const pathname = usePathname();
+  const { t } = useI18n();
+  const { dashUser } = useAuth();
+  const canAccessAdmin = dashUser?.role === "student_admin" || dashUser?.role === "admin";
 
   return (
     <div className="w-[64px] hidden md:flex flex-col items-center py-3 gap-1 sidebar-bg border-r h-full">
@@ -54,23 +58,25 @@ export function ServerSidebar() {
           );
         })}
 
-        <button className="group relative flex items-center justify-center w-full mt-1" title="Create community">
+        <Link href="/main/groups?create=true" className="group relative flex items-center justify-center w-full mt-1" title="Create community">
           <div className="w-11 h-11 rounded-2xl border border-dashed border-border flex items-center justify-center text-muted-foreground transition-all duration-200 group-hover:rounded-xl group-hover:border-primary/40 group-hover:text-primary group-hover:bg-primary/8">
             <Plus className="w-4 h-4" />
           </div>
-        </button>
+        </Link>
       </div>
 
       <div className="w-6 h-px bg-border my-1" />
 
       {/* Bottom actions */}
       <div className="flex flex-col items-center gap-1">
-        <SidebarIconBtn href="/main/notifications" icon={Bell}    label="Notifications" pathname={pathname} />
-        <SidebarIconBtn href="/main/search"        icon={Search}   label="Search"        pathname={pathname} />
-        <SidebarIconBtn href="/main/groups"  icon={Users}    label="Groups"   pathname={pathname} />
-        <SidebarIconBtn href="/main/support" icon={LifeBuoy} label="Support"  pathname={pathname} />
-        <SidebarIconBtn href="/main/admin"   icon={Shield}   label="Admin"    pathname={pathname} danger />
-        <SidebarIconBtn href="/main/profile" icon={Settings} label="Settings" pathname={pathname} />
+        <SidebarIconBtn href="/main/notifications" icon={Bell}    label={t("notifications")} pathname={pathname} />
+        <SidebarIconBtn href="/main/messages"      icon={MessageCircle} label={t("messages")} pathname={pathname} />
+        <SidebarIconBtn href="/main/search"        icon={Search}   label={t("search")} pathname={pathname} />
+        <SidebarIconBtn href="/main/support" icon={LifeBuoy} label={t("support")} pathname={pathname} />
+        {canAccessAdmin && (
+          <SidebarIconBtn href="/main/admin" icon={Shield} label={t("admin")} pathname={pathname} danger />
+        )}
+        <SidebarIconBtn href="/main/profile" icon={Settings} label={t("settings")} pathname={pathname} />
       </div>
     </div>
   );
@@ -110,6 +116,8 @@ function SidebarIconBtn({
 export function ChannelSidebar() {
   const pathname = usePathname();
   const { t } = useI18n();
+  const { dashUser } = useAuth();
+  const initials = (dashUser?.fullName ?? "D").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   const categories = [
     {
@@ -118,7 +126,6 @@ export function ChannelSidebar() {
         { name: t("feed"),        icon: Megaphone,   href: "/main",             badge: "3" },
         { name: "general",        icon: Hash,        href: "/main" },
         { name: t("events"),      icon: BookOpen,    href: "/main/events" },
-        { name: t("groups"),      icon: Users,       href: "/main/groups" },
         { name: t("search"),      icon: Search,      href: "/main/search" },
       ],
     },
@@ -135,7 +142,7 @@ export function ChannelSidebar() {
   return (
     <div className="w-56 flex flex-col h-full sidebar-bg">
       <div className="h-12 px-4 border-b border-border flex items-center font-headline font-bold text-sm tracking-tight cursor-pointer hover:bg-muted/30 transition-colors shrink-0">
-        Campus Global
+        {dashUser?.schoolName || "Dash"}
       </div>
 
       <div className="flex-1 overflow-y-auto py-3 space-y-4 no-scrollbar">
@@ -179,11 +186,11 @@ export function ChannelSidebar() {
       {/* User strip */}
       <Link href="/main/profile" className="px-3 py-2.5 border-t border-border flex items-center gap-2.5 hover:bg-muted/30 transition-colors cursor-pointer group shrink-0">
         <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-[11px] relative shrink-0">
-          AR
+          {initials}
           <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border-2 border-card" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-semibold truncate leading-none">Alex Rivera</p>
+          <p className="text-[12px] font-semibold truncate leading-none">{dashUser?.fullName ?? "Student"}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">{t("online")}</p>
         </div>
         <Settings className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />

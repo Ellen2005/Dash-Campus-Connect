@@ -1,55 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { PostCard } from "@/components/feed/post-card";
 import { CreatePostDialog } from "@/components/feed/create-post-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { StoryViewer, type Story } from "@/components/shared/story-viewer";
-import { Megaphone, PlusCircle, Filter, Bell, AlertTriangle } from "lucide-react";
+import { Megaphone, Filter, Bell, AlertTriangle } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { OnboardingTour } from "@/components/shared/onboarding-tour";
-import { AddStoryDialog } from "@/components/shared/add-story-dialog";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 
-const MOCK_STORIES: Story[] = [
-  { id: "s1", user: "Football 🏈", avatar: "", isLive: true, items: [{ type: "text", text: "LIVE: Campus vs Tech — 2nd Half!", bg: "bg-gradient-to-br from-destructive/80 to-destructive/40" }] },
-  { id: "s2", user: "Hackathon",   avatar: "", items: [{ type: "image", src: "https://picsum.photos/seed/hack/400/700" }, { type: "text", text: "48 hours of building! 🚀", bg: "bg-gradient-to-br from-primary/80 to-primary/40" }] },
-  { id: "s3", user: "Cafe Deals",  avatar: "", items: [{ type: "text", text: "☕ 20% off all drinks today!", bg: "bg-gradient-to-br from-amber-600/80 to-amber-400/40" }] },
-  { id: "s4", user: "Library",     avatar: "", items: [{ type: "image", src: "https://picsum.photos/seed/lib/400/700" }] },
-];
-
-// Posts with distinct channels — "general" only shows general posts, not all
-const ALL_POSTS = [
-  { id: "p1", author: { name: "Alex Rivera",   username: "arivera_comp",    avatar: "https://picsum.photos/seed/alex/100/100",   flair: "Engineering '26" }, content: "Just finished the distributed systems project! If anyone needs help with the Raft algorithm implementation, hit me up. #ComputerScience #Raft", image: "https://picsum.photos/seed/code/800/400", timestamp: "15m ago", score: 124, comments: 18, channel: "general" },
-  { id: "p2", author: { name: "Campus Dining", username: "dine_dash",       avatar: "https://picsum.photos/seed/dine/100/100",   isVerified: true },          content: "Friday Special: Sushi Bar is back at the main cafeteria! Students get a 10% discount with their Dash profile QR code. 🍣✨", timestamp: "1h ago", score: 89, comments: 4, channel: "general" },
-  { id: "p3", author: { name: "Jordan Lee",    username: "jlee_arts",       avatar: "https://picsum.photos/seed/jordan/100/100", flair: "Arts '25" },          content: "Lost my blue North Face jacket near the library yesterday evening. Has my student ID inside. Please DM if found! 🙏", timestamp: "3h ago", score: 34, comments: 7, channel: "lost-and-found" },
-  { id: "p4", author: { name: "Study Squad",   username: "study_squad_eng", avatar: "https://picsum.photos/seed/squad/100/100", flair: "Study Group" },        content: "Looking for 2 more people to join our Algorithms study group! We meet every Tuesday at 6pm in the library. DM to join. 📚", timestamp: "5h ago", score: 56, comments: 11, channel: "course-reviews" },
-  { id: "p5", author: { name: "Housing Board", username: "housing_board",   avatar: "https://picsum.photos/seed/house/100/100", isVerified: true },             content: "Room available near campus — 2-bedroom apartment, 5 min walk. Utilities included. DM for details. 🏠", timestamp: "6h ago", score: 28, comments: 5, channel: "housing" },
-];
-
-const ANNOUNCEMENTS = [{
-  id: "a1",
-  author: { name: "University Registry", username: "registry_official", avatar: "https://picsum.photos/seed/reg/100/100", isVerified: true },
-  content: "IMPORTANT: Graduation registration for Class of 2025 is now open. Please ensure all outstanding fees are settled by Friday to avoid delays.",
-  timestamp: "2h ago", score: 45, comments: 12, isAnnouncement: true,
-}];
-
-// "all" shows everything, each channel shows only its posts
-const CHANNELS = ["all", "general", "lost-and-found", "course-reviews", "housing"];
+// Posts API is currently normalized as "general" for now.
+const CHANNELS = ["all", "general"];
 
 export function AuthenticatedFeed() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [activeChannel, setActiveChannel] = useState("all");
-  const [storyOpen, setStoryOpen] = useState(false);
-  const [storyIdx, setStoryIdx] = useState(0);
-  const [addStoryOpen, setAddStoryOpen] = useState(false);
+  const [realPosts, setRealPosts] = useState<any[]>([]);
+  const [realAnnouncements, setRealAnnouncements] = useState<any[]>([]);
 
-  // "all" = every post, specific channel = only that channel's posts
-  const posts = activeChannel === "all"
-    ? ALL_POSTS
-    : ALL_POSTS.filter(p => p.channel === activeChannel);
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const postsRes = await fetch("/api/posts?limit=50", { cache: "no-store" });
+        const postsJson = await postsRes.json().catch(() => ({} as any));
+        const normalizedPosts = Array.isArray(postsJson?.posts)
+          ? postsJson.posts.map((p: any) => ({
+              id: p.id,
+              author: {
+                name: p.author?.name ?? "Student",
+                username: p.author?.username ?? "student",
+                avatar: p.author?.profilePhoto ?? "",
+              },
+              content: p.content ?? "",
+              image: Array.isArray(p.images) ? p.images[0] : undefined,
+              timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : "now",
+              score: Array.isArray(p.likes) ? p.likes.length : 0,
+              comments: Array.isArray(p.comments) ? p.comments.length : 0,
+              channel: "general",
+            }))
+          : [];
+        setRealPosts(normalizedPosts);
+      } catch {
+        setRealPosts([]);
+      }
+
+      if (!user?.id) return;
+      try {
+        const annRes = await fetch(`/api/notifications?userId=${encodeURIComponent(user.id)}`, { cache: "no-store" });
+        const annJson = await annRes.json().catch(() => ({} as any));
+        const normalizedAnnouncements = Array.isArray(annJson?.notifications)
+          ? annJson.notifications
+              .filter((n: any) => n.type === "SYSTEM_ALERT")
+              .map((n: any) => ({
+                id: `an-${n.id}`,
+                author: { name: "School Admin", username: "school_admin", avatar: "", isVerified: true },
+                content: n.message,
+                actionUrl: n.actionUrl ?? undefined,
+                timestamp: n.createdAt ? new Date(n.createdAt).toLocaleString() : "now",
+                score: 0,
+                comments: 0,
+                isAnnouncement: true,
+              }))
+          : [];
+        setRealAnnouncements(normalizedAnnouncements);
+      } catch {
+        setRealAnnouncements([]);
+      }
+    };
+    run();
+  }, [user?.id]);
+
+  const posts = activeChannel === "all" ? realPosts : realPosts.filter((p: any) => p.channel === activeChannel);
+  const mergedAnnouncements = realAnnouncements;
 
   return (
     <div className="space-y-5 page-enter">
@@ -98,36 +124,12 @@ export function AuthenticatedFeed() {
         ))}
       </div>
 
-      {/* Stories */}
-      <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 border-b border-border/50">
-        <button onClick={() => setAddStoryOpen(true)} className="flex flex-col items-center gap-1 min-w-[60px] group">
-          <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center bg-muted/20 hover:border-primary/40 transition-colors">
-            <PlusCircle className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-[9px] font-semibold text-muted-foreground">{t("addStory")}</span>
-        </button>
-        {MOCK_STORIES.map((s, i) => (
-          <button key={s.id} onClick={() => { setStoryIdx(i); setStoryOpen(true); }} className="flex flex-col items-center gap-1 min-w-[60px] group">
-            <div className={cn("w-12 h-12 rounded-full border-2 p-0.5 transition-transform group-hover:scale-105",
-              s.isLive ? "border-destructive" : "border-primary/50"
-            )}>
-              <div className={cn("w-full h-full rounded-full flex items-center justify-center text-[9px] font-bold",
-                s.isLive ? "bg-destructive text-white" : "bg-primary/15 text-primary"
-              )}>
-                {s.isLive ? t("liveNow") : s.user[0]}
-              </div>
-            </div>
-            <span className="text-[9px] font-semibold text-foreground/80 truncate max-w-[60px]">{s.user}</span>
-          </button>
-        ))}
-      </div>
-
       {/* Announcements */}
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
           <Megaphone className="w-3 h-3 text-primary" /> {t("officialAnnouncements")}
         </div>
-        {ANNOUNCEMENTS.map((a, i) => (
+        {mergedAnnouncements.map((a: any, i: number) => (
           <div key={a.id} className="animate-in fade-in duration-200" style={{ animationDelay: `${i * 40}ms` }}>
             <PostCard {...a} />
           </div>
@@ -141,7 +143,7 @@ export function AuthenticatedFeed() {
             <p className="text-sm">No posts in #{activeChannel} yet.</p>
             <p className="text-xs mt-1">Be the first to post here!</p>
           </div>
-        ) : posts.map((p, i) => (
+        ) : posts.map((p: any, i: number) => (
           <div key={p.id} className="animate-in fade-in duration-200" style={{ animationDelay: `${i * 50}ms` }}>
             <PostCard {...p} />
           </div>
@@ -154,8 +156,6 @@ export function AuthenticatedFeed() {
         </div>
       </div>
 
-      <StoryViewer stories={MOCK_STORIES} initialIndex={storyIdx} open={storyOpen} onClose={() => setStoryOpen(false)} />
-      <AddStoryDialog open={addStoryOpen} onClose={() => setAddStoryOpen(false)} />
       <OnboardingTour />
     </div>
   );

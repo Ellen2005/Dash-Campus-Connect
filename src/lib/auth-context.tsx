@@ -41,8 +41,11 @@ interface DashUser {
   schoolName: string;
   faculty: string;
   year: string;
+  fieldOfStudyId?: string;
+  levelId?: string;
   role: "student" | "student_admin" | "admin";
   status: "pending" | "active" | "suspended";
+  isStudentAdmin: boolean;
   avatar?: string;
 }
 
@@ -58,10 +61,13 @@ interface AuthContextType {
     password: string;
     fullName: string;
     username: string;
-    faculty: string;
-    year: string;
+    faculty?: string;
+    year?: string;
+    fieldOfStudyId?: string;
+    levelId?: string;
   }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  refreshUserMetadata: () => Promise<void>;
   supabase: SupabaseClient;
 }
 
@@ -70,6 +76,7 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null }),
   signOut: async () => {},
+  refreshUserMetadata: async () => {},
   supabase,
 });
 
@@ -84,8 +91,11 @@ function buildDashUser(u: User): DashUser {
     schoolName: meta.school_name ?? "",
     faculty: meta.faculty ?? "",
     year: meta.year ?? "",
+    fieldOfStudyId: meta.field_of_study_id,
+    levelId: meta.level_id,
     role: meta.role ?? "student",
     status: meta.status ?? "pending",
+    isStudentAdmin: meta.is_student_admin ?? false,
     avatar: meta.avatar_url,
   };
 }
@@ -96,6 +106,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
+  const refreshInFlight = useRef(false);
+  const lastMetadataRefreshAt = useRef(0);
+
+  const syncFromUser = (nextUser: User | null) => {
+    setUser(nextUser);
+    setDashUser(nextUser ? buildDashUser(nextUser) : null);
+  };
+
+  const refreshUserMetadata = async () => {
+    if (refreshInFlight.current) return;
+    const now = Date.now();
+    if (now - lastMetadataRefreshAt.current < 60_000) return;
+
+    refreshInFlight.current = true;
+    try {
+      const client = getSupabase();
+      const { data: sessionData } = await client.auth.getSession();
+      const currentSession = sessionData.session;
+
+      if (!currentSession) {
+        setSession(null);
+        syncFromUser(null);
+        return;
+      }
+
+      const { data: userData, error: userError } = await client.auth.getUser();
+      if (!userError) {
+        syncFromUser(userData.user ?? currentSession.user ?? null);
+        lastMetadataRefreshAt.current = now;
+        return;
+      }
+
+      syncFromUser(currentSession.user ?? null);
+      lastMetadataRefreshAt.current = now;
+    } finally {
+      refreshInFlight.current = false;
+    }
+  };
 
   useEffect(() => {
     if (initialized.current) return;
@@ -107,23 +155,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     client.auth.getSession().then(({ data }) => {
       const s = data.session;
       setSession(s);
-      const u = s?.user ?? null;
-      setUser(u);
-      if (u) setDashUser(buildDashUser(u));
+      syncFromUser(s?.user ?? null);
       setLoading(false);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = client.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      const u = s?.user ?? null;
-      setUser(u);
-      setDashUser(u ? buildDashUser(u) : null);
+      syncFromUser(s?.user ?? null);
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const refresh = () => {
+      void refreshUserMetadata();
+    };
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) return;
+    void refreshUserMetadata();
+  }, [session?.user?.id]);
 
   const signIn = async (studentId: string, schoolId: string, password: string) => {
     const email = toSyntheticEmail(studentId, schoolId);
@@ -133,7 +204,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (data: {
     studentId: string; schoolId: string; password: string;
-    fullName: string; username: string; faculty: string; year: string;
+    fullName: string; username: string; faculty?: string; year?: string;
+    fieldOfStudyId?: string; levelId?: string;
   }) => {
     try {
       const res = await fetch("/api/auth/register", {
@@ -147,10 +219,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: data.username.trim().toLowerCase().replace(/\s/g, "_"),
           faculty: data.faculty,
           year: data.year,
+          fieldOfStudyId: data.fieldOfStudyId,
+          levelId: data.levelId,
         }),
       });
-      const json = await res.json().catch(() => ({} as Record<string, string>));
-      if (!res.ok) return { error: json?.error ?? "Registration failed. Please try again." };
+      const contentType = res.headers.get("content-type") ?? "";
+      let json: Record<string, string> = {};
+      let text = "";
+
+      if (contentType.includes("application/json")) {
+        json = await res.json().catch(() => ({} as Record<string, string>));
+      } else {
+        text = await res.text().catch(() => "");
+      }
+
+      if (!res.ok) {
+        return {
+          error:
+            json?.error ??
+            (text ? "Server returned a non-JSON error response. Please retry." : "Registration failed. Please try again."),
+        };
+      }
       return { error: null };
     } catch {
       return { error: "Network error. Please check your connection and try again." };
@@ -165,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, dashUser, session, loading, signIn, signUp, signOut, supabase }}>
+    <AuthContext.Provider value={{ user, dashUser, session, loading, signIn, signUp, signOut, refreshUserMetadata, supabase }}>
       {children}
     </AuthContext.Provider>
   );

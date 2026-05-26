@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,84 +14,148 @@ import {
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
 
-const MOCK_USERS: Record<string, {
-  name: string; username: string; avatar: string; cover: string;
-  bio: string; faculty: string; location: string; joined: string;
-  followers: number; following: number; isVerified?: boolean; flair?: string;
-}> = {
-  "arivera_comp": {
-    name: "Alex Rivera", username: "arivera_comp",
-    avatar: "https://picsum.photos/seed/alex/200/200",
-    cover: "https://picsum.photos/seed/alexcover/1200/400",
-    bio: "Final year Computer Science student. Passionate about AI and distributed systems.",
-    faculty: "Computer Science", location: "Modern Campus, Wing B", joined: "Sept 2021",
-    followers: 245, following: 189, flair: "Engineering '26",
-  },
-  "schen_bio": {
-    name: "Sarah Chen", username: "schen_bio",
-    avatar: "https://picsum.photos/seed/sarah/200/200",
-    cover: "https://picsum.photos/seed/sarahcover/1200/400",
-    bio: "Biology student with a love for marine ecosystems and environmental research.",
-    faculty: "Biology", location: "Science Block, Lab 3", joined: "Jan 2022",
-    followers: 189, following: 134, flair: "Biology '25",
-  },
-  "jlee_arts": {
-    name: "Jordan Lee", username: "jlee_arts",
-    avatar: "https://picsum.photos/seed/jordan/200/200",
-    cover: "https://picsum.photos/seed/jordancover/1200/400",
-    bio: "Arts student, photographer, and campus storyteller.",
-    faculty: "Arts & Humanities", location: "Arts Building", joined: "Sept 2022",
-    followers: 312, following: 201, flair: "Arts '25",
-  },
-  "registry_official": {
-    name: "University Registry", username: "registry_official",
-    avatar: "https://picsum.photos/seed/reg/200/200",
-    cover: "https://picsum.photos/seed/regcover/1200/400",
-    bio: "Official University Registry account. For all academic and administrative matters.",
-    faculty: "Administration", location: "Admin Block, Room 101", joined: "Jan 2020",
-    followers: 8432, following: 0, isVerified: true,
-  },
-};
-
-const DEFAULT_USER = {
-  name: "Campus Student", username: "student",
-  avatar: "https://picsum.photos/seed/default/200/200",
-  cover: "https://picsum.photos/seed/defaultcover/1200/400",
-  bio: "A student at this campus.", faculty: "Unknown", location: "Campus",
-  joined: "2024", followers: 0, following: 0,
+type ProfileUser = {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+  cover: string;
+  bio: string;
+  faculty: string;
+  location: string;
+  joined: string;
+  followers: number;
+  following: number;
+  isVerified: boolean;
+  flair?: string;
+  isFollowing?: boolean;
 };
 
 export default function UserProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { t } = useI18n();
   const { toast } = useToast();
-  const user = MOCK_USERS[username] ?? { ...DEFAULT_USER, username };
+  const { dashUser } = useAuth();
+  const [user, setUser] = useState<ProfileUser | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  const [posts, setPosts] = useState<any[]>([]);
 
   const [following, setFollowing] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgText, setMsgText] = useState("");
   const [sending, setSending] = useState(false);
 
-  const handleFollow = () => {
-    setFollowing(f => !f);
-    toast({ title: following ? `Unfollowed ${user.name}` : `Following ${user.name} 👋` });
+  const handleFollow = async () => {
+    if (!dashUser || !user) return;
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(user.id)}/follow`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ followerId: dashUser.id }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      setFollowing((v) => !v);
+      toast({ title: following ? `Unfollowed ${user.name}` : `Following ${user.name} 👋` });
+    } catch {
+      toast({ title: "Follow failed", description: "Please try again." });
+    }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!msgText.trim()) return;
+    if (!dashUser || !user || !msgText.trim()) return;
     setSending(true);
-    setTimeout(() => {
-      setSending(false);
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          senderId: dashUser.id,
+          recipient: user.id,
+          content: msgText.trim(),
+          images: [],
+        }),
+      });
+      if (!res.ok) throw new Error("Message send failed");
       setMsgOpen(false);
       setMsgText("");
-      toast({
-        title: `Message sent to ${user.name} ✅`,
-        description: "They'll be notified and can reply in your inbox.",
-      });
-    }, 900);
+      toast({ title: `Message sent to ${user.name} ✅`, description: "They'll be notified in their inbox." });
+    } catch {
+      toast({ title: "Message failed", description: "Please try again." });
+    } finally {
+      setSending(false);
+    }
   };
+
+  useEffect(() => {
+    const run = async () => {
+      setLoadingProfile(true);
+      try {
+        const qs = new URLSearchParams({ username });
+        if (dashUser?.id) qs.set("currentUserId", dashUser.id);
+        const res = await fetch(`/api/users/lookup?${qs.toString()}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok || !json?.user) throw new Error(json?.error ?? "Failed to load profile");
+
+        const u = json.user as any;
+        const nextUser: ProfileUser = {
+          id: u.id,
+          name: u.name ?? username,
+          username: u.username ?? username,
+          avatar: u.profilePhoto ?? "",
+          cover: u.coverPhoto ?? "",
+          bio: u.bio ?? "",
+          faculty: u.major ?? "",
+          location: u.hometown ?? "",
+          joined: u.year ?? "",
+          followers: u.followersCount ?? 0,
+          following: u.followingCount ?? 0,
+          isVerified: u.role === "ADMIN" || u.role === "SUPER_ADMIN",
+          flair: "",
+          isFollowing: !!u.isFollowing,
+        };
+        setUser(nextUser);
+        setFollowing(!!u.isFollowing);
+
+        const postsRes = await fetch(`/api/posts?authorId=${encodeURIComponent(u.id)}&limit=10`, { cache: "no-store" });
+        const postsJson = await postsRes.json().catch(() => ({} as any));
+        const nextPosts = Array.isArray(postsJson?.posts)
+          ? postsJson.posts.map((p: any) => ({
+              id: p.id,
+              content: p.content ?? "",
+              image: Array.isArray(p.images) ? p.images[0] : undefined,
+              timestamp: p.createdAt ? new Date(p.createdAt).toLocaleString() : "now",
+              score: Array.isArray(p.likes) ? p.likes.length : 0,
+              comments: Array.isArray(p.comments) ? p.comments.length : 0,
+              author: {
+                name: p.author?.name ?? "Student",
+                username: p.author?.username ?? "student",
+                avatar: p.author?.profilePhoto ?? "",
+                isVerified: false,
+              },
+            }))
+          : [];
+        setPosts(nextPosts);
+      } catch {
+        setUser(null);
+        setPosts([]);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    void run();
+  }, [username, dashUser?.id]);
+
+  if (loadingProfile || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="pb-16 page-enter">
@@ -193,19 +257,19 @@ export default function UserProfilePage({ params }: { params: Promise<{ username
               ))}
             </TabsList>
             <TabsContent value="posts" className="pt-5 space-y-4">
-              <PostCard
-                author={{ name: user.name, username: user.username, avatar: user.avatar, isVerified: user.isVerified, flair: user.flair }}
-                content={`Hi! I'm ${user.name}, studying ${user.faculty}. Feel free to connect with me on Dash! 👋`}
-                timestamp="Recently" score={42} comments={8}
-              />
+              {posts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No posts yet.
+                </div>
+              ) : (
+                posts.map((p) => (
+                  <PostCard key={p.id} {...p} />
+                ))
+              )}
             </TabsContent>
             <TabsContent value="media" className="pt-5">
-              <div className="grid grid-cols-3 gap-1.5">
-                {[1,2,3,4,5,6].map(i => (
-                  <div key={i} className="aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer hover:opacity-90 transition-opacity">
-                    <img src={`https://picsum.photos/seed/${username}${i}/300/300`} className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                ))}
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                Media gallery is not available yet.
               </div>
             </TabsContent>
           </Tabs>

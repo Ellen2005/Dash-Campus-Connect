@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,15 +24,12 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Search,
-  Filter,
   Plus,
   Heart,
   MessageCircle,
   MapPin,
-  DollarSign,
   Package,
   Book,
   Laptop,
@@ -43,132 +40,190 @@ import {
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth-context";
+import { ensureDbUser } from "@/lib/client-user";
+import { uploadFile } from "@/lib/upload";
+import { useRouter } from "next/navigation";
+import { useI18n } from "@/lib/i18n";
 
 interface Listing {
   id: string;
   title: string;
-  price: number;
-  currency: string;
+  price?: number | null;
+  isFree?: boolean;
   category: string;
   condition: string;
   description: string;
   images: string[];
   seller: {
+    id: string;
     name: string;
     username: string;
     avatar: string;
-    rating: number;
-    verified: boolean;
   };
+  averageRating?: number | null;
   location: string;
   timestamp: string;
   saved?: boolean;
 }
 
 export default function MarketplacePage() {
+  const { t } = useI18n();
   const { toast } = useToast();
+  const router = useRouter();
+  const { dashUser, session } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [savedItems, setSavedItems] = useState<string[]>([]);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({
+    title: "",
+    price: "",
+    category: "TEXTBOOKS",
+    condition: "GOOD",
+    description: "",
+    photos: [] as File[],
+  });
 
   const toggleSave = (id: string) => {
     setSavedItems(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
-    toast({ title: savedItems.includes(id) ? "Removed from saved" : "Item saved!", description: savedItems.includes(id) ? "" : "Find it in your saved items." });
+      toast({ title: savedItems.includes(id) ? "Removed from saved" : "Item saved!", description: savedItems.includes(id) ? "" : "Find it in your saved items." });
   };
 
-  const handleMessage = (sellerName: string) => {
-    toast({ title: `Message sent to ${sellerName}`, description: "They'll be notified and can reply in your inbox." });
+  const loadListings = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "48");
+      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (selectedCategory !== "all") params.set("category", selectedCategory);
+
+      const res = await fetch(`/api/marketplace?${params.toString()}`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load listings.");
+
+      const nextListings: Listing[] = Array.isArray(json?.listings)
+        ? json.listings.map((listing: any) => ({
+            id: listing.id,
+            title: listing.title,
+            price: listing.price,
+            isFree: listing.isFree,
+            category: listing.category,
+            condition: listing.condition,
+            description: listing.description,
+            images: Array.isArray(listing.images) ? listing.images : [],
+            seller: {
+              id: listing.seller?.id,
+              name: listing.seller?.name ?? "Student",
+              username: listing.seller?.username ?? "student",
+              avatar: listing.seller?.profilePhoto ?? "",
+            },
+            averageRating: listing.averageRating,
+            location: listing.preferredContact ?? "campus",
+            timestamp: listing.createdAt ? new Date(listing.createdAt).toLocaleString() : "now",
+          }))
+        : [];
+
+      setListings(nextListings);
+    } catch (error: any) {
+      toast({ title: t("marketplaceUnavailable"), description: error?.message ?? "Please try again." });
+      setListings([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadListings();
+  }, [searchQuery, selectedCategory]);
+
+  const handleMessage = async (listing: Listing) => {
+    if (!dashUser) return;
+    if (listing.seller.id === dashUser.id) {
+      toast({ title: t("yourListing"), description: t("cannotMessageSelf") });
+      return;
+    }
+
+    try {
+      await ensureDbUser(dashUser, session);
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          senderId: dashUser.id,
+          recipient: listing.seller.id,
+          content: `Hi ${listing.seller.name}, I'm interested in "${listing.title}". Is it still available?`,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to message seller.");
+
+      toast({ title: `Message sent to ${listing.seller.name}`, description: t("openingInbox") });
+      router.push("/main/messages");
+    } catch (error: any) {
+      toast({ title: t("unableToMessageSeller"), description: error?.message ?? "Please try again." });
+    }
   };
 
   const categories = [
     { value: "all", label: "All Items", icon: Package },
-    { value: "textbooks", label: "Textbooks", icon: Book },
-    { value: "electronics", label: "Electronics", icon: Laptop },
-    { value: "housing", label: "Housing", icon: Home },
-    { value: "transportation", label: "Transportation", icon: Car },
-    { value: "clothing", label: "Clothing", icon: Shirt },
+    { value: "TEXTBOOKS", label: "Textbooks", icon: Book },
+    { value: "ELECTRONICS", label: "Electronics", icon: Laptop },
+    { value: "HOUSING", label: "Housing", icon: Home },
+    { value: "SERVICES", label: "Services", icon: Car },
+    { value: "OTHER", label: "Other", icon: Shirt },
   ];
+  const filteredListings = useMemo(() => listings, [listings]);
 
-  const mockListings: Listing[] = [
-    {
-      id: "1",
-      title: "Introduction to Algorithms - CLRS",
-      price: 45,
-      currency: "XAF",
-      category: "textbooks",
-      condition: "Good",
-      description: "Third edition, some highlighting but in great condition. Perfect for CS students.",
-      images: ["https://picsum.photos/seed/book1/300/300"],
-      seller: {
-        name: "Alex Rivera",
-        username: "arivera_cs",
-        avatar: "https://picsum.photos/seed/alex/40/40",
-        rating: 4.8,
-        verified: true
-      },
-      location: "Engineering Building",
-      timestamp: "2 hours ago"
-    },
-    {
-      id: "2",
-      title: "MacBook Pro M2 13-inch",
-      price: 1200,
-      currency: "XAF",
-      category: "electronics",
-      condition: "Like New",
-      description: "Selling my 2022 MacBook Pro. 16GB RAM, 512GB SSD. Comes with original box and charger.",
-      images: ["https://picsum.photos/seed/macbook/300/300"],
-      seller: {
-        name: "Sarah Chen",
-        username: "schen_bio",
-        avatar: "https://picsum.photos/seed/sarah/40/40",
-        rating: 5.0,
-        verified: true
-      },
-      location: "Library",
-      timestamp: "1 day ago"
-    },
-    {
-      id: "3",
-      title: "Room for Rent - Near Campus",
-      price: 300,
-      currency: "XAF",
-      category: "housing",
-      condition: "N/A",
-      description: "Private room in a 4-bedroom apartment. 5 min walk to campus. Utilities included.",
-      images: ["https://picsum.photos/seed/room/300/300"],
-      seller: {
-        name: "Mike Johnson",
-        username: "mjohnson_bus",
-        avatar: "https://picsum.photos/seed/mike/40/40",
-        rating: 4.5,
-        verified: false
-      },
-      location: "Oak Street",
-      timestamp: "3 days ago"
-    }
-  ];
-
-  const filteredListings = mockListings.filter(listing => {
-    const matchesSearch = listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         listing.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || listing.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const handleCreateListing = async (e: React.FormEvent) => {
+  const handleCreateListing = async (e: FormEvent) => {
     e.preventDefault();
+    if (!dashUser) return;
+
     setIsCreating(true);
-    setTimeout(() => {
+    try {
+      await ensureDbUser(dashUser, session);
+      const numericPrice = Number(form.price);
+      const isFree = !form.price || Number.isNaN(numericPrice) || numericPrice <= 0;
+      const uploadedImages: string[] = [];
+      for (const file of form.photos) {
+        const uploaded = await uploadFile(file, "marketplace", dashUser.id);
+        if (uploaded.error || !uploaded.url) throw new Error(uploaded.error ?? "Failed to upload marketplace image.");
+        uploadedImages.push(uploaded.url);
+      }
+
+      const res = await fetch("/api/marketplace", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: form.title.trim(),
+          description: form.description.trim(),
+          sellerId: dashUser.id,
+          category: form.category,
+          condition: form.condition,
+          price: isFree ? undefined : numericPrice,
+          isFree,
+          images: uploadedImages,
+          preferredContact: "chat",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to create listing.");
+
       setIsCreating(false);
       setIsCreateDialogOpen(false);
+      setForm({ title: "", price: "", category: "TEXTBOOKS", condition: "GOOD", description: "", photos: [] });
+      await loadListings();
       toast({
         title: "Listing Created",
         description: "Your item has been posted to the marketplace.",
       });
-    }, 1500);
+    } catch (error: any) {
+      setIsCreating(false);
+      toast({ title: t("listingFailed"), description: error?.message ?? "Please try again." });
+    }
   };
 
   return (
@@ -176,19 +231,19 @@ export default function MarketplacePage() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-headline font-bold">Campus Marketplace</h1>
+          <h1 className="text-2xl font-headline font-bold">{t("campusMarketplace")}</h1>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="dash-button-primary gap-2">
                 <Plus className="w-4 h-4" />
-                Sell Item
+                {t("sellItem")}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
               <DialogHeader>
-                <DialogTitle className="text-xl font-headline font-bold">List Your Item</DialogTitle>
+                <DialogTitle className="text-xl font-headline font-bold">{t("listYourItem")}</DialogTitle>
                 <DialogDescription>
-                  Post an item for sale or trade with fellow students.
+                  {t("postItemSale")}
                 </DialogDescription>
               </DialogHeader>
 
@@ -196,31 +251,30 @@ export default function MarketplacePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Item Title</Label>
-                      <Input placeholder="e.g. Calculus Textbook" className="bg-background/50 border-border" required />
+                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("itemTitle")}</Label>
+                      <Input value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} placeholder="e.g. Calculus Textbook" className="bg-background/50 border-border" required />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Price</Label>
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("priceLabel")}</Label>
                         <div className="relative">
-                          <Input type="number" placeholder="0" className="bg-background/50 border-border pl-8" required />
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                          <Input type="number" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} placeholder="0" className="bg-background/50 border-border pl-16" />
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-primary">FCFA</span>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Category</Label>
-                        <Select defaultValue="textbooks">
+                        <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value }))}>
                           <SelectTrigger className="bg-background/50 border-border">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="textbooks">Textbooks</SelectItem>
-                            <SelectItem value="electronics">Electronics</SelectItem>
-                            <SelectItem value="housing">Housing</SelectItem>
-                            <SelectItem value="transportation">Transportation</SelectItem>
-                            <SelectItem value="clothing">Clothing</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="TEXTBOOKS">Textbooks</SelectItem>
+                            <SelectItem value="ELECTRONICS">Electronics</SelectItem>
+                            <SelectItem value="HOUSING">Housing</SelectItem>
+                            <SelectItem value="SERVICES">Services</SelectItem>
+                            <SelectItem value="OTHER">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -228,16 +282,15 @@ export default function MarketplacePage() {
 
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Condition</Label>
-                      <Select defaultValue="good">
+                      <Select value={form.condition} onValueChange={(value) => setForm((current) => ({ ...current, condition: value }))}>
                         <SelectTrigger className="bg-background/50 border-border">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="like-new">Like New</SelectItem>
-                          <SelectItem value="good">Good</SelectItem>
-                          <SelectItem value="fair">Fair</SelectItem>
-                          <SelectItem value="poor">Poor</SelectItem>
+                          <SelectItem value="NEW">New</SelectItem>
+                          <SelectItem value="LIKE_NEW">Like New</SelectItem>
+                          <SelectItem value="GOOD">Good</SelectItem>
+                          <SelectItem value="FAIR">Fair</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -245,8 +298,10 @@ export default function MarketplacePage() {
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Description</Label>
+                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("descriptionLabel")}</Label>
                       <Textarea
+                        value={form.description}
+                        onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
                         placeholder="Describe your item in detail..."
                         className="min-h-[100px] bg-background/50 border-border resize-none"
                         maxLength={1000}
@@ -255,12 +310,19 @@ export default function MarketplacePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Photos</Label>
-                      <div className="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center gap-2 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
+                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("photosLabel")}</Label>
+                      <label className="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center gap-2 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
                         <Package className="w-8 h-8 text-muted-foreground" />
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Upload Photos</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{form.photos.length > 0 ? `${form.photos.length} selected` : t("uploadPhotos")}</span>
                         <span className="text-[9px] text-muted-foreground">Max 5 • JPG, PNG</span>
-                      </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => setForm((current) => ({ ...current, photos: Array.from(e.target.files ?? []).slice(0, 5) }))}
+                        />
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -271,7 +333,7 @@ export default function MarketplacePage() {
                   </Button>
                   <Button type="submit" className="dash-button-primary px-8" disabled={isCreating}>
                     {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                    List Item
+                    {t("listItem")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -284,7 +346,7 @@ export default function MarketplacePage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search items..."
+              placeholder={t("searchItems")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 bg-background/50 border-border"
@@ -309,7 +371,11 @@ export default function MarketplacePage() {
       </div>
 
       {/* Listings Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground">
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("loadingListings")}
+        </div>
+      ) : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredListings.map((listing, i) => (
           <Card
             key={listing.id}
@@ -319,7 +385,7 @@ export default function MarketplacePage() {
             <CardHeader className="p-0">
               <div className="aspect-square rounded-t-xl overflow-hidden bg-muted">
                 <img
-                  src={listing.images[0]}
+                  src={listing.images[0] || "https://picsum.photos/seed/market-default/300/300"}
                   alt={listing.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />
@@ -330,7 +396,7 @@ export default function MarketplacePage() {
                 <h3 className="font-bold text-sm line-clamp-2">{listing.title}</h3>
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-headline font-bold text-primary">
-                    {listing.currency} {listing.price}
+                    {listing.isFree ? t("free") : `FCFA ${listing.price ?? 0}`}
                   </span>
                   <Badge variant="secondary" className="text-[10px]">
                     {listing.condition}
@@ -344,7 +410,7 @@ export default function MarketplacePage() {
                   <AvatarFallback className="text-[10px]">{listing.seller.name[0]}</AvatarFallback>
                 </Avatar>
                 <span className="text-xs text-muted-foreground truncate">{listing.seller.name}</span>
-                {listing.seller.verified && (
+                {listing.averageRating && listing.averageRating >= 4 && (
                   <span className="verified-badge text-[8px]">✓</span>
                 )}
               </div>
@@ -355,7 +421,7 @@ export default function MarketplacePage() {
               </div>
             </CardContent>
             <CardFooter className="p-4 pt-0 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => handleMessage(listing.seller.name)}>
+              <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => handleMessage(listing)}>
                 <MessageCircle className="w-3 h-3" />
                 Message
               </Button>
@@ -370,13 +436,13 @@ export default function MarketplacePage() {
             </CardFooter>
           </Card>
         ))}
-      </div>
+      </div>}
 
-      {filteredListings.length === 0 && (
+      {!loading && filteredListings.length === 0 && (
         <div className="text-center py-12">
           <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="font-bold text-lg mb-2">No items found</h3>
-          <p className="text-muted-foreground">Try adjusting your search or filters.</p>
+          <h3 className="font-bold text-lg mb-2">{t("noItemsFound")}</h3>
+          <p className="text-muted-foreground">{t("adjustSearchFilters")}</p>
         </div>
       )}
     </div>

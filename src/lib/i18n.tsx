@@ -8,6 +8,7 @@ const en = {
   // Navigation
   feed: "Feed", events: "Events", market: "Market", support: "Support",
   profile: "Profile", groups: "Groups", search: "Search", admin: "Admin",
+  notifications: "Notifications",
   lostFound: "Lost & Found",
 
   // Feed
@@ -49,7 +50,7 @@ const en = {
   // Connections
   myConnections: "My Connections", addFriend: "Add Friend", findPeople: "Find People",
   searchPeople: "Search people…", sendRequest: "Connect", pending: "Pending",
-  connected: "Connected", message: "Message", mutualConnections: "mutual connections",
+  connected: "Connected", message: "Message", messages: "Messages", mutualConnections: "mutual connections",
 
   // Groups
   campusGroups: "Campus Groups", createGroup: "Create Group", joinGroup: "Join",
@@ -59,11 +60,15 @@ const en = {
   publicGroup: "Public", privateGroup: "Private",
   groupCreated: "Group created!", groupLeft: "Left group", groupJoined: "Joined group!",
   whatIsGroupAbout: "What is this group about?",
+  groupsUnavailable: "Groups unavailable", groupUpdateFailed: "Group update failed",
+  groupCreationFailed: "Group creation failed", loadingGroups: "Loading groups...",
 
   // Search
   searchPlaceholder: "Search people, groups, posts…", people: "People",
   results: "Results", noResults: "No results found",
-  tryDifferent: "Try a different search term",
+  tryDifferent: "Try a different search term", searchUnavailable: "Search unavailable",
+  connectionFailed: "Connection failed", groupActionFailed: "Group action failed",
+  searchItems: "Search items...",
 
   // Lost & Found
   lostFoundTitle: "Lost & Found",
@@ -88,7 +93,7 @@ const en = {
   // Settings
   appearance: "Appearance", theme: "Theme", language: "Language",
   chooseTheme: "Choose your theme", chooseLanguage: "Choose language",
-  notifications: "Notifications", privacy: "Privacy", account: "Account",
+  privacy: "Privacy", account: "Account",
   dangerZone: "Danger Zone", deleteAccount: "Delete Account",
   lightMode: "Light Mode", darkMode: "Dark Mode",
 
@@ -107,9 +112,18 @@ const en = {
   describeIssue: "Describe the issue in detail…",
   ticketSubmitted: "Ticket Submitted", ticketFollowUp: "We'll review your request and follow up shortly.",
   updatedAt: "Updated",
+  loadingConversations: "Loading conversations...",
+  loadingMessages: "Loading messages...",
+  searchConversations: "Search conversations...",
+  noConversationsYet: "No conversations yet.",
+  startConversation: "Start the conversation.",
+  selectConversation: "Select a conversation to start messaging.",
+  groupConversation: "Group conversation",
+  writeMessage: "Write a message...",
 
   // Auth
   signIn: "Sign In", signUp: "Sign Up", email: "Email", password: "Password",
+  signOut: "Sign Out",
   forgotPassword: "Forgot password?", joinCampus: "Join Your Campus",
   welcomeBack: "Welcome to Dash", premiumPlatform: "The premium university connection platform.",
   enterCredentials: "Enter your credentials to access campus",
@@ -133,6 +147,7 @@ const en = {
   fullName: "Full Name", username: "Username", faculty: "Faculty",
   yearOfStudy: "Year of Study", confirmPassword: "Confirm Password",
   schoolName: "School Name", schoolDomain: "School Email Domain",
+  studentIdLabel: "Student ID", unknown: "Unknown", suggested: "Suggested",
 
   // Admin
   adminPanel: "Admin Panel", manageStudents: "Manage Students",
@@ -155,6 +170,15 @@ const en = {
   requireApproval: "Require Admin Approval",
   requireApprovalDesc: "When enabled, students must be approved before accessing the platform",
   saveSettings: "Save Settings", organizedBy: "Organized by",
+  campusMarketplace: "Campus Marketplace", sellItem: "Sell Item",
+  listYourItem: "List Your Item", postItemSale: "Post an item for sale or trade with fellow students.",
+  itemTitle: "Item Title", priceLabel: "Price", descriptionLabel: "Description",
+  photosLabel: "Photos", uploadPhotos: "Upload Photos", listItem: "List Item",
+  services: "Services", other: "Other", free: "Free",
+  marketplaceUnavailable: "Marketplace unavailable", listingFailed: "Listing failed",
+  noItemsFound: "No items found", adjustSearchFilters: "Try adjusting your search or filters.",
+  loadingListings: "Loading listings...", yourListing: "Your listing", cannotMessageSelf: "You cannot message yourself.",
+  unableToMessageSeller: "Unable to message seller", openingInbox: "Opening your inbox...",
 
   // General
   loading: "Loading", online: "Online", verified: "Verified", anonymous: "Anonymous",
@@ -195,6 +219,7 @@ const fr: Record<TranslationKey, string> = {
   // Navigation
   feed: "Fil", events: "Événements", market: "Marché", support: "Support",
   profile: "Profil", groups: "Groupes", search: "Rechercher", admin: "Admin",
+  notifications: "Notifications",
   lostFound: "Objets Trouvés",
 
   // Feed
@@ -236,7 +261,7 @@ const fr: Record<TranslationKey, string> = {
   // Connections
   myConnections: "Mes Connexions", addFriend: "Ajouter un ami", findPeople: "Trouver des personnes",
   searchPeople: "Rechercher des personnes…", sendRequest: "Connecter", pending: "En attente",
-  connected: "Connecté", message: "Message", mutualConnections: "connexions en commun",
+  connected: "Connecté", message: "Message", messages: "Messages", mutualConnections: "connexions en commun",
 
   // Groups
   campusGroups: "Groupes du Campus", createGroup: "Créer un groupe", joinGroup: "Rejoindre",
@@ -246,11 +271,15 @@ const fr: Record<TranslationKey, string> = {
   publicGroup: "Public", privateGroup: "Privé",
   groupCreated: "Groupe créé !", groupLeft: "Groupe quitté", groupJoined: "Groupe rejoint !",
   whatIsGroupAbout: "De quoi parle ce groupe ?",
+  groupsUnavailable: "Groupes indisponibles", groupUpdateFailed: "La mise à jour du groupe a échoué",
+  groupCreationFailed: "La création du groupe a échoué", loadingGroups: "Chargement des groupes...",
 
   // Search
   searchPlaceholder: "Rechercher personnes, groupes, posts…", people: "Personnes",
   results: "Résultats", noResults: "Aucun résultat",
-  tryDifferent: "Essayez un autre terme de recherche",
+  tryDifferent: "Essayez un autre terme de recherche", searchUnavailable: "Recherche indisponible",
+  connectionFailed: "La connexion a échoué", groupActionFailed: "L'action du groupe a échoué",
+  searchItems: "Rechercher des articles...",
 
   // Lost & Found
   lostFoundTitle: "Objets Trouvés",
@@ -275,7 +304,7 @@ const fr: Record<TranslationKey, string> = {
   // Settings
   appearance: "Apparence", theme: "Thème", language: "Langue",
   chooseTheme: "Choisir votre thème", chooseLanguage: "Choisir la langue",
-  notifications: "Notifications", privacy: "Confidentialité", account: "Compte",
+  privacy: "Confidentialité", account: "Compte",
   dangerZone: "Zone dangereuse", deleteAccount: "Supprimer le compte",
   lightMode: "Mode clair", darkMode: "Mode sombre",
 
@@ -294,9 +323,18 @@ const fr: Record<TranslationKey, string> = {
   describeIssue: "Décrivez le problème en détail…",
   ticketSubmitted: "Ticket soumis", ticketFollowUp: "Nous examinerons votre demande et vous répondrons.",
   updatedAt: "Mis à jour",
+  loadingConversations: "Chargement des conversations...",
+  loadingMessages: "Chargement des messages...",
+  searchConversations: "Rechercher des conversations...",
+  noConversationsYet: "Aucune conversation pour le moment.",
+  startConversation: "Commencez la conversation.",
+  selectConversation: "Sélectionnez une conversation pour envoyer des messages.",
+  groupConversation: "Conversation de groupe",
+  writeMessage: "Écrire un message...",
 
   // Auth
   signIn: "Se connecter", signUp: "S'inscrire", email: "Email", password: "Mot de passe",
+  signOut: "Se déconnecter",
   forgotPassword: "Mot de passe oublié ?", joinCampus: "Rejoindre votre campus",
   welcomeBack: "Bienvenue sur Dash", premiumPlatform: "La plateforme universitaire premium.",
   enterCredentials: "Entrez vos identifiants pour accéder au campus",
@@ -320,6 +358,7 @@ const fr: Record<TranslationKey, string> = {
   fullName: "Nom complet", username: "Nom d'utilisateur", faculty: "Faculté",
   yearOfStudy: "Année d'études", confirmPassword: "Confirmer le mot de passe",
   schoolName: "Nom de l'école", schoolDomain: "Domaine email de l'école",
+  studentIdLabel: "Numéro étudiant", unknown: "Inconnu", suggested: "Suggestions",
 
   // Admin
   adminPanel: "Panneau Admin", manageStudents: "Gérer les étudiants",
@@ -342,6 +381,15 @@ const fr: Record<TranslationKey, string> = {
   requireApproval: "Approbation admin requise",
   requireApprovalDesc: "Quand activé, les étudiants doivent être approuvés avant d'accéder à la plateforme",
   saveSettings: "Enregistrer les paramètres", organizedBy: "Organisé par",
+  campusMarketplace: "Marché du Campus", sellItem: "Vendre un article",
+  listYourItem: "Lister votre article", postItemSale: "Publiez un article à vendre ou à échanger avec d'autres étudiants.",
+  itemTitle: "Titre de l'article", priceLabel: "Prix", descriptionLabel: "Description",
+  photosLabel: "Photos", uploadPhotos: "Téléverser des photos", listItem: "Publier l'article",
+  services: "Services", other: "Autre", free: "Gratuit",
+  marketplaceUnavailable: "Marché indisponible", listingFailed: "La publication a échoué",
+  noItemsFound: "Aucun article trouvé", adjustSearchFilters: "Essayez d'ajuster votre recherche ou vos filtres.",
+  loadingListings: "Chargement des annonces...", yourListing: "Votre annonce", cannotMessageSelf: "Vous ne pouvez pas vous envoyer un message.",
+  unableToMessageSeller: "Impossible de contacter le vendeur", openingInbox: "Ouverture de votre messagerie...",
 
   // General
   loading: "Chargement", online: "En ligne", verified: "Vérifié", anonymous: "Anonyme",

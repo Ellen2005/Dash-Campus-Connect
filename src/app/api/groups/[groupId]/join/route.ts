@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+const JOIN_REQUEST_TITLE = 'GROUP_JOIN_REQUEST';
+const joinRequestToken = (groupId: string, userId: string) => `JOIN_REQ::${groupId}::${userId}`;
 
 const JoinGroupSchema = z.object({
   userId: z.string(),
@@ -16,18 +18,14 @@ export async function POST(
     const body = await request.json()
     const { userId } = JoinGroupSchema.parse(body)
 
-    // Check if group exists and is public
+    // Check if group exists
     const group = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { id: true, isPublic: true },
+      select: { id: true, isPublic: true, creatorId: true, name: true },
     })
 
     if (!group) {
       return NextResponse.json({ error: 'Group not found' }, { status: 404 })
-    }
-
-    if (!group.isPublic) {
-      return NextResponse.json({ error: 'This group is private' }, { status: 403 })
     }
 
     // Check if user is already a member
@@ -42,6 +40,39 @@ export async function POST(
 
     if (existingMember) {
       return NextResponse.json({ error: 'User is already a member of this group' }, { status: 400 })
+    }
+
+    if (!group.isPublic) {
+      if (!group.creatorId) {
+        return NextResponse.json({ error: 'Private group has no owner configured.' }, { status: 500 })
+      }
+
+      const token = joinRequestToken(groupId, userId)
+      const existingRequest = await prisma.notification.findFirst({
+        where: {
+          userId: group.creatorId,
+          type: 'SYSTEM_ALERT',
+          title: JOIN_REQUEST_TITLE,
+          message: { contains: token },
+          isRead: false,
+        },
+        select: { id: true },
+      })
+
+      if (existingRequest) {
+        return NextResponse.json({ success: true, requested: true, message: 'Join request already pending approval.' })
+      }
+
+      await prisma.notification.create({
+        data: {
+          userId: group.creatorId,
+          type: 'SYSTEM_ALERT',
+          title: JOIN_REQUEST_TITLE,
+          message: `${token}::${group.name ?? 'Private group'}`,
+        },
+      })
+
+      return NextResponse.json({ success: true, requested: true, message: 'Join request sent to group owner.' })
     }
 
     // Add user to group

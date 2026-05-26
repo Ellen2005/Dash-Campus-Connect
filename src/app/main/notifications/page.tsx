@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { useNotifPrefs } from "@/hooks/use-notif-prefs";
+import { useAuth } from "@/lib/auth-context";
 
 type NotifType = "like" | "comment" | "follow" | "mention" | "announcement" | "admin_tag" | "community" | "post_reported" | "post_deleted";
 
@@ -30,17 +31,7 @@ interface Notif {
   community?: string;
 }
 
-const MOCK_NOTIFS: Notif[] = [
-  { id: "n1", type: "admin_tag",    read: false, time: "5m ago",  text: "Admin: Please report to the Dean's office today at 2PM.", sub: "Tagged specifically for you", priority: "urgent" },
-  { id: "n2", type: "announcement", read: false, time: "1h ago",  text: "Graduation registration for Class of 2025 is now open.", sub: "University Registry · All Students", priority: "normal" },
-  { id: "n3", type: "community",    read: false, time: "2h ago",  text: "New announcement for Computer Science '26: Lab sessions moved to Block D.", sub: "CS '26 Community", priority: "normal", community: "CS '26" },
-  { id: "n4", type: "like",         read: false, time: "3h ago",  text: "Sarah Chen liked your post", sub: "Just finished the distributed systems project…", actor: "Sarah Chen", actorAvatar: "https://picsum.photos/seed/sarah/40/40" },
-  { id: "n5", type: "comment",      read: true,  time: "5h ago",  text: "Mike Johnson commented on your post", sub: "Have you tried the new study rooms?", actor: "Mike Johnson", actorAvatar: "https://picsum.photos/seed/mike/40/40" },
-  { id: "n6", type: "follow",       read: true,  time: "1d ago",  text: "Jordan Lee started following you", actor: "Jordan Lee", actorAvatar: "https://picsum.photos/seed/jordan/40/40" },
-  { id: "n7", type: "mention",      read: true,  time: "1d ago",  text: "Priya Sharma mentioned you in a post", sub: "@arivera_comp check this out!", actor: "Priya Sharma", actorAvatar: "https://picsum.photos/seed/priya/40/40" },
-  { id: "n8", type: "post_reported",read: true,  time: "2d ago",  text: "Your post was reported by a user", sub: "Our team will review it shortly.", priority: "normal" },
-  { id: "n9", type: "announcement", read: true,  time: "2d ago",  text: "Campus library hours extended during finals week.", sub: "University Admin · All Students", priority: "normal" },
-];
+const EMPTY_NOTIFS: Notif[] = [];
 
 const ICON_MAP: Record<NotifType, { icon: React.ElementType; color: string }> = {
   like:          { icon: Heart,         color: "text-destructive bg-destructive/10" },
@@ -69,7 +60,39 @@ const PREF_LABELS: { key: keyof ReturnType<typeof useNotifPrefs>["prefs"]; label
 export default function NotificationsPage() {
   const { t } = useI18n();
   const { prefs, updatePref } = useNotifPrefs();
-  const [notifs, setNotifs] = useState(MOCK_NOTIFS);
+  const { user } = useAuth();
+  const [notifs, setNotifs] = useState<Notif[]>(EMPTY_NOTIFS);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const run = async () => {
+      try {
+        const res = await fetch(`/api/notifications?userId=${encodeURIComponent(user.id)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok || !Array.isArray(json?.notifications)) return;
+
+        const realNotifs: Notif[] = json.notifications.map((n: any) => ({
+          id: n.id,
+          type:
+            n.type === "MESSAGE" ? "comment" :
+            n.type === "LIKE" ? "like" :
+            n.type === "COMMENT" ? "comment" :
+            n.type === "FRIEND_REQUEST" ? "follow" :
+            n.type === "MENTION" ? "mention" :
+            "announcement",
+          read: n.isRead,
+          time: new Date(n.createdAt).toLocaleString(),
+          text: n.title,
+          sub: n.message,
+          priority: "normal",
+        }));
+        setNotifs(realNotifs);
+      } catch {
+        setNotifs([]);
+      }
+    };
+    run();
+  }, [user?.id]);
 
   const markAllRead = () => setNotifs(n => n.map(x => ({ ...x, read: true })));
   const markRead = (id: string) => setNotifs(n => n.map(x => x.id === id ? { ...x, read: true } : x));

@@ -33,7 +33,7 @@ export default function AdminRegisterPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (form.schoolName.trim().length < 3) { setError("School name must be at least 3 characters."); return; }
@@ -43,12 +43,31 @@ export default function AdminRegisterPage() {
     if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      setGeneratedId(form.schoolId.trim().toLowerCase());
-      setLoading(false);
+    try {
+      const res = await fetch("/api/admin-portal/register-school", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          schoolName: form.schoolName.trim(),
+          schoolId: form.schoolId.trim().toLowerCase(),
+          country: form.country.trim() || undefined,
+          adminName: form.adminName.trim(),
+          password: form.password,
+        }),
+      });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(json?.error ?? "Registration failed. Please try again.");
+        return;
+      }
+      setGeneratedId(json?.school?.id ?? form.schoolId.trim().toLowerCase());
       setDone(true);
-      toast({ title: "School registered! 🎉", description: `${form.schoolName} is now on Dash.` });
-    }, 1200);
+      toast({ title: "School registered!", description: `${form.schoolName} is now on Dash.` });
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (done) {

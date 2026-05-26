@@ -10,13 +10,6 @@ import { DashLogo } from "@/components/shared/dash-logo";
 import { Building2, Lock, Hash, ArrowRight, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// Mock admin credentials — in production these come from DB
-const MOCK_ADMINS = [
-  { schoolId: "ubuea", password: "admin123", schoolName: "University of Buea" },
-  { schoolId: "uyd",   password: "admin123", schoolName: "University of Yaoundé I" },
-  { schoolId: "demo",  password: "demo1234", schoolName: "Demo University" },
-];
-
 export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -26,31 +19,33 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!schoolId.trim()) { setError("Please enter your School ID."); return; }
     if (!password)        { setError("Please enter your password."); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      const admin = MOCK_ADMINS.find(
-        a => a.schoolId.toLowerCase() === schoolId.trim().toLowerCase() && a.password === password
-      );
-      if (!admin) {
-        setError("Incorrect School ID or password. Please try again.");
+    try {
+      const res = await fetch("/api/admin-portal/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ schoolId: schoolId.trim().toLowerCase(), password }),
+      });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        setError(json?.error ?? "Incorrect School ID or password. Please try again.");
         setLoading(false);
         return;
       }
-      toast({ title: `Welcome, ${admin.schoolName} Admin 👋`, description: "You are now logged in to the admin portal." });
-      try {
-        localStorage.setItem("dash_admin_schoolId", admin.schoolId);
-        localStorage.setItem("dash_admin_schoolName", admin.schoolName);
-      } catch {
-        // ignore storage errors (private mode, blocked storage, etc.)
-      }
+
+      toast({ title: `Welcome, ${json?.school?.name ?? "School"} Admin`, description: "You are now logged in to the admin portal." });
       router.push("/admin-portal");
-    }, 1000);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

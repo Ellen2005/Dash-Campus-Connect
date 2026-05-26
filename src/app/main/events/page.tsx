@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,24 @@ import { EventCard } from "@/components/events/event-card";
 import { CreateEventDialog } from "@/components/events/create-event-dialog";
 import { Search, Filter, Sparkles, BookOpen, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 
-const categories = ["All", "Social", "Academic", "Sports", "Career", "Cultural", "Club", "Emergency"];
+const categories = ["All"];
 
-const mockEvents = [
-  { id: "e1", title: "Class of 2025 Sunset Mixer",    bannerImageUrl: "https://picsum.photos/seed/mixer/800/450",    startDate: "2025-05-15T18:00:00", locationName: "Main Campus Green",          category: "Social",   organiserName: "Student Council",  organiserAvatar: "https://picsum.photos/seed/sc/100/100",  attendeeCount: 145,  maxAttendees: 200,  rsvpStatus: "Going" as const },
-  { id: "e2", title: "AI in Medicine Workshop",        bannerImageUrl: "https://picsum.photos/seed/med/800/450",      startDate: "2025-05-17T10:00:00", locationName: "Health Sciences Bldg, Rm 402", category: "Academic", organiserName: "Medical Tech Club", organiserAvatar: "https://picsum.photos/seed/mtc/100/100", attendeeCount: 42,   maxAttendees: 50 },
-  { id: "e3", title: "Varsity Football: Dash vs Tech", bannerImageUrl: "https://picsum.photos/seed/football/800/450", startDate: "2025-05-20T15:30:00", locationName: "Olympic Stadium",             category: "Sports",   organiserName: "Athletics Dept",   organiserAvatar: "https://picsum.photos/seed/ath/100/100", attendeeCount: 1250, maxAttendees: 5000 },
-  { id: "e4", title: "Career Fair 2025",               bannerImageUrl: "https://picsum.photos/seed/career/800/450",   startDate: "2025-05-22T09:00:00", locationName: "Main Hall",                   category: "Career",   organiserName: "Career Services",  organiserAvatar: "https://picsum.photos/seed/cs2/100/100", attendeeCount: 320,  maxAttendees: 500 },
-  { id: "e5", title: "Cultural Night",                 bannerImageUrl: "https://picsum.photos/seed/culture/800/450",  startDate: "2025-05-25T19:00:00", locationName: "Amphitheatre",                category: "Cultural", organiserName: "Cultural Club",    organiserAvatar: "https://picsum.photos/seed/cc/100/100",  attendeeCount: 280,  maxAttendees: 400 },
-];
+type EventItem = {
+  id: string;
+  title: string;
+  bannerImageUrl: string;
+  startDate: string;
+  locationName: string;
+  category: string;
+  organiserName: string;
+  organiserAvatar: string;
+  attendeeCount: number;
+  maxAttendees?: number;
+  rsvpStatus?: "Going" | "Maybe" | "Not Going" | null;
+  organizerId?: string;
+};
 
 const HOST_GUIDELINES = [
   { icon: "📋", title: "Submit your event", desc: "Fill in the event form with title, date, location, and description. Events are reviewed within 24 hours." },
@@ -33,8 +41,40 @@ export default function EventsPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
+  const [events, setEvents] = useState<EventItem[]>([]);
 
-  const filteredEvents = mockEvents.filter(e => {
+  const { dashUser } = useAuth();
+
+  const loadEvents = async () => {
+    const params = new URLSearchParams();
+    params.set("limit", "100");
+    if (searchQuery.trim()) params.set("search", searchQuery.trim());
+    const res = await fetch(`/api/events?${params.toString()}`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({} as any));
+    if (!res.ok) return;
+    const next = Array.isArray(json?.events)
+      ? json.events.map((event: any) => ({
+          id: event.id,
+          title: event.title,
+          bannerImageUrl: event.bannerImageUrl || "https://picsum.photos/seed/event-default/800/450",
+          startDate: event.date,
+          locationName: event.location,
+          category: selectedCategory,
+          organiserName: event.organizer?.name ?? "Organizer",
+          organiserAvatar: event.organizer?.profilePhoto ?? "",
+          attendeeCount: event._count?.attendees ?? 0,
+          maxAttendees: event.capacity ?? undefined,
+          organizerId: event.organizer?.id,
+        }))
+      : [];
+    setEvents(next);
+  };
+
+  useEffect(() => {
+    void loadEvents();
+  }, [searchQuery, dashUser?.id, selectedCategory]);
+
+  const filteredEvents = events.filter(e => {
     const matchesCategory = selectedCategory === "All" || e.category === selectedCategory;
     const matchesSearch = !searchQuery ||
       e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -43,7 +83,15 @@ export default function EventsPage() {
     return matchesCategory && matchesSearch;
   });
 
-  const myEvents = mockEvents.filter(e => e.rsvpStatus === "Going");
+  const now = new Date();
+  const upcoming = filteredEvents.filter((e) => new Date(e.startDate) >= now);
+  const past = filteredEvents.filter((e) => new Date(e.startDate) < now);
+  const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const week = filteredEvents.filter((e) => {
+    const d = new Date(e.startDate);
+    return d >= now && d <= weekEnd;
+  });
+  const myEvents = dashUser ? upcoming.filter((e) => e.organizerId === dashUser.id) : [];
 
   return (
     <div className="space-y-6 pb-20 page-enter">
@@ -52,7 +100,7 @@ export default function EventsPage() {
           <h1 className="text-2xl font-headline font-extrabold tracking-tight">Campus Events</h1>
           <p className="text-sm text-muted-foreground">Connect, learn, and celebrate with your community.</p>
         </div>
-        <CreateEventDialog />
+        <CreateEventDialog onCreated={loadEvents} />
       </div>
 
       <div className="space-y-4">
@@ -100,7 +148,7 @@ export default function EventsPage() {
           </TabsList>
 
           <TabsContent value="upcoming" className="pt-5">
-            {filteredEvents.length === 0 ? (
+            {upcoming.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">No events found for "{selectedCategory}"</p>
@@ -108,7 +156,7 @@ export default function EventsPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {filteredEvents.map((event, i) => (
+                {upcoming.map((event, i) => (
                   <div key={event.id} className="animate-in fade-in duration-200" style={{ animationDelay: `${i * 80}ms` }}>
                     <EventCard {...event} />
                   </div>
@@ -138,7 +186,7 @@ export default function EventsPage() {
 
           <TabsContent value="week" className="pt-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredEvents.slice(0, 2).map((event, i) => (
+              {week.slice(0, 2).map((event, i) => (
                 <div key={event.id} className="animate-in fade-in duration-200" style={{ animationDelay: `${i * 80}ms` }}>
                   <EventCard {...event} />
                 </div>
@@ -165,9 +213,19 @@ export default function EventsPage() {
           </TabsContent>
 
           <TabsContent value="past" className="pt-5">
-            <div className="text-center py-12 text-muted-foreground">
-              <p className="text-sm">No past events to show</p>
-            </div>
+            {past.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-sm">No past events to show</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {past.map((event, i) => (
+                  <div key={event.id} className="animate-in fade-in duration-200" style={{ animationDelay: `${i * 80}ms` }}>
+                    <EventCard {...event} />
+                  </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

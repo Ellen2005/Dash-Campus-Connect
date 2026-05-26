@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ServerSidebar, ChannelSidebar } from "@/components/layout/discord-sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Users, Search, X, Settings, Shield, MessageCircle, Loader2 } from "lucide-react";
+import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Search, X, Settings, Shield, MessageCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -14,22 +14,20 @@ import { useAuth } from "@/lib/auth-context";
 
 const mobileNavItems = (t: (k: any) => string) => [
   { href: "/main",              icon: Home,        label: t("feed") },
-  { href: "/main/groups",       icon: Users,       label: t("groups") },
-  { href: "/main/notifications",icon: Bell,        label: t("notifications") },
+  { href: "/main/messages",     icon: MessageCircle,label: t("messages") },
   { href: "/main/search",       icon: Search,      label: t("search") },
   { href: "/main/profile",      icon: User,        label: t("profile") },
 ];
 
 const drawerLinks = (t: (k: any) => string) => [
   { href: "/main",              icon: Home,        label: t("feed") },
-  { href: "/main/groups",       icon: Users,       label: t("groups") },
   { href: "/main/events",       icon: CalendarDays,label: t("events") },
   { href: "/main/marketplace",  icon: ShoppingBag, label: t("market") },
   { href: "/main/lost-found",   icon: Search,      label: t("lostFound") },
   { href: "/main/support",      icon: LifeBuoy,    label: t("support") },
   { href: "/main/notifications",icon: Bell,        label: t("notifications") },
+  { href: "/main/messages",     icon: MessageCircle,label: t("messages") },
   { href: "/main/profile",      icon: Settings,    label: t("settings") },
-  { href: "/main/admin",        icon: Shield,      label: t("admin") },
 ];
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -38,6 +36,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const { t } = useI18n();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, dashUser, loading, signOut } = useAuth();
+  const canAccessAdmin = dashUser?.role === "student_admin" || dashUser?.role === "admin";
 
   const navItems = mobileNavItems(t);
 
@@ -51,7 +50,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     return (
       <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loadingâ€¦
+          <Loader2 className="w-4 h-4 animate-spin" /> {t("loading")}...
         </div>
       </div>
     );
@@ -66,24 +65,24 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <div className="flex justify-center">
             <DashLogo size={56} />
           </div>
-          <h1 className="text-2xl font-headline font-bold">Awaiting Admin Approval</h1>
+          <h1 className="text-2xl font-headline font-bold">{t("awaitingApproval")}</h1>
           <p className="text-sm text-muted-foreground">
-            Your account is created, but access is limited until your school admin approves you.
+            {t("approvalPending")}
           </p>
           <div className="dash-card p-5 space-y-3 text-left">
             <p className="text-xs text-muted-foreground">
-              Student ID: <span className="font-mono text-primary font-bold">{dashUser.studentId}</span>
+              {t("studentIdLabel")}: <span className="font-mono text-primary font-bold">{dashUser.studentId}</span>
             </p>
             <p className="text-xs text-muted-foreground">
-              School: <span className="font-semibold text-foreground">{dashUser.schoolId || "Unknown"}</span>
+              {t("schoolName")}: <span className="font-semibold text-foreground">{dashUser.schoolId || t("unknown")}</span>
             </p>
           </div>
           <div className="flex gap-2 justify-center">
             <Button className="dash-button-primary" onClick={() => router.replace("/")}>
-              Back to Home
+              {t("back")}
             </Button>
             <Button variant="outline" onClick={() => signOut()}>
-              Sign Out
+              {t("signOut")}
             </Button>
           </div>
         </div>
@@ -119,6 +118,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground">
                 <Bell className="w-4 h-4" />
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
+              </Button>
+            </Link>
+            <Link href="/main/messages">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <MessageCircle className="w-4 h-4" />
               </Button>
             </Link>
             <Button
@@ -181,7 +185,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <div className="dash-card p-4 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Suggested</h3>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("suggested")}</h3>
           {[
             { name: "Dr. Sarah Miller",    username: "sarahm",  verified: true },
             { name: "Engineering Society", username: "eng_soc", verified: true },
@@ -231,18 +235,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <div className="px-5 py-4 border-b border-border shrink-0">
               <div className="flex items-center gap-3">
                 <Avatar className="w-10 h-10">
-                  <AvatarFallback className="bg-primary/15 text-primary font-bold">AR</AvatarFallback>
+                  <AvatarFallback className="bg-primary/15 text-primary font-bold">
+                    {(dashUser?.fullName ?? "D").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-semibold">Alex Rivera</p>
-                  <p className="text-[11px] text-muted-foreground">@arivera_comp</p>
+                  <p className="text-sm font-semibold">{dashUser?.fullName ?? "Student"}</p>
+                  <p className="text-[11px] text-muted-foreground">@{dashUser?.username ?? "student"}</p>
                 </div>
               </div>
             </div>
 
             {/* Nav links */}
             <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
-              {drawerLinks(t).map(({ href, icon: Icon, label }) => {
+              {[...drawerLinks(t), ...(canAccessAdmin ? [{ href: "/main/admin", icon: Shield, label: t("admin") }] : [])].map(({ href, icon: Icon, label }) => {
                 const active = pathname === href || (href !== "/main" && pathname.startsWith(href));
                 return (
                   <Link

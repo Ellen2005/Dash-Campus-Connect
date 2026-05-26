@@ -1,0 +1,1119 @@
+const fs = require('fs');
+const path = require('path');
+
+const baseDir = process.cwd();
+
+// Step 1: Create directories
+console.log('Creating directories...');
+[
+  'src/app/api/admin/fields',
+  'src/app/api/admin/levels',
+  'src/app/api/admin/students',
+  'src/app/api/communities',
+  'src/app/api/auth/registration-fields'
+].forEach(dir => {
+  const fullPath = path.join(baseDir, dir);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+    console.log('  ✓', dir);
+  }
+});
+
+// Step 2: Create files
+console.log('\nCreating files...\n');
+
+// Fields API
+fs.writeFileSync(
+  path.join(baseDir, 'src/app/api/admin/fields/route.ts'),
+  `import { prisma } from "@/lib/prisma";
+import { requireAdminSession } from "@/lib/require-admin";
+import { createAutoCommunitiesForField } from "@/lib/communities";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const CreateFieldSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+});
+
+const UpdateFieldSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+});
+
+type ApiResponse<T = any> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const schoolId = session.admin.schoolId;
+
+    const fields = await prisma.fieldOfStudy.findMany({
+      where: { schoolId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: fields,
+    });
+  } catch (error) {
+    console.error("Error fetching fields:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch fields",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const body = await req.json();
+    const { name, description } = CreateFieldSchema.parse(body);
+
+    const schoolId = session.admin.schoolId;
+
+    // Check for duplicate
+    const existing = await prisma.fieldOfStudy.findFirst({
+      where: {
+        schoolId,
+        name: {
+          equals: name,
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "A field with this name already exists",
+        },
+        { status: 400 }
+      );
+    }
+
+    const field = await prisma.fieldOfStudy.create({
+      data: {
+        name,
+        description,
+        schoolId,
+      },
+    });
+
+    // Auto-create communities for this field
+    await createAutoCommunitiesForField(schoolId, field.id, field.name);
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: field,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid input: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error creating field:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to create field",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const body = await req.json();
+    const fieldId = body.id;
+
+    if (!fieldId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Field ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { name, description } = UpdateFieldSchema.parse(body);
+    const schoolId = session.admin.schoolId;
+
+    // Verify field belongs to school
+    const field = await prisma.fieldOfStudy.findUnique({
+      where: { id: fieldId },
+    });
+
+    if (!field || field.schoolId !== schoolId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Field not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Check for duplicate name (excluding current field)
+    if (name !== field.name) {
+      const existing = await prisma.fieldOfStudy.findFirst({
+        where: {
+          schoolId,
+          name: {
+            equals: name,
+            mode: "insensitive",
+          },
+          id: { not: fieldId },
+        },
+      });
+
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A field with this name already exists",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updated = await prisma.fieldOfStudy.update({
+      where: { id: fieldId },
+      data: {
+        name,
+        description,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid input: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error updating field:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to update field",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const { searchParams } = new URL(req.url);
+    const fieldId = searchParams.get("id");
+
+    if (!fieldId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Field ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const schoolId = session.admin.schoolId;
+
+    // Verify field belongs to school
+    const field = await prisma.fieldOfStudy.findUnique({
+      where: { id: fieldId },
+    });
+
+    if (!field || field.schoolId !== schoolId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Field not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Delete field and associated communities (cascade will handle it)
+    await prisma.fieldOfStudy.delete({
+      where: { id: fieldId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { id: fieldId },
+    });
+  } catch (error) {
+    console.error("Error deleting field:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to delete field",
+      },
+      { status: 500 }
+    );
+  }
+}
+`,
+  'utf8'
+);
+console.log('  ✓ src/app/api/admin/fields/route.ts');
+
+// Levels API
+fs.writeFileSync(
+  path.join(baseDir, 'src/app/api/admin/levels/route.ts'),
+  `import { prisma } from "@/lib/prisma";
+import { requireAdminSession } from "@/lib/require-admin";
+import { createAutoCommunitiesForLevel } from "@/lib/communities";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const CreateLevelSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  order: z.number().int().default(0),
+});
+
+const UpdateLevelSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  order: z.number().int(),
+});
+
+type ApiResponse<T = any> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const schoolId = session.admin.schoolId;
+
+    const levels = await prisma.level.findMany({
+      where: { schoolId },
+      orderBy: { order: "asc" },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: levels,
+    });
+  } catch (error) {
+    console.error("Error fetching levels:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch levels",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const body = await req.json();
+    const { name, description, order } = CreateLevelSchema.parse(body);
+
+    const schoolId = session.admin.schoolId;
+
+    // Check for duplicate
+    const existing = await prisma.level.findFirst({
+      where: {
+        schoolId,
+        name: {
+          equals: name,
+          mode: "insensitive",
+        },
+      },
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "A level with this name already exists",
+        },
+        { status: 400 }
+      );
+    }
+
+    const level = await prisma.level.create({
+      data: {
+        name,
+        description,
+        order,
+        schoolId,
+      },
+    });
+
+    // Auto-create communities for this level
+    await createAutoCommunitiesForLevel(schoolId, level.id, level.name);
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: level,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid input: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error creating level:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to create level",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const body = await req.json();
+    const levelId = body.id;
+
+    if (!levelId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Level ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { name, description, order } = UpdateLevelSchema.parse(body);
+    const schoolId = session.admin.schoolId;
+
+    // Verify level belongs to school
+    const level = await prisma.level.findUnique({
+      where: { id: levelId },
+    });
+
+    if (!level || level.schoolId !== schoolId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Level not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Check for duplicate name (excluding current level)
+    if (name !== level.name) {
+      const existing = await prisma.level.findFirst({
+        where: {
+          schoolId,
+          name: {
+            equals: name,
+            mode: "insensitive",
+          },
+          id: { not: levelId },
+        },
+      });
+
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "A level with this name already exists",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updated = await prisma.level.update({
+      where: { id: levelId },
+      data: {
+        name,
+        description,
+        order,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid input: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error updating level:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to update level",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const { searchParams } = new URL(req.url);
+    const levelId = searchParams.get("id");
+
+    if (!levelId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Level ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    const schoolId = session.admin.schoolId;
+
+    // Verify level belongs to school
+    const level = await prisma.level.findUnique({
+      where: { id: levelId },
+    });
+
+    if (!level || level.schoolId !== schoolId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Level not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Delete level and associated communities (cascade will handle it)
+    await prisma.level.delete({
+      where: { id: levelId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { id: levelId },
+    });
+  } catch (error) {
+    console.error("Error deleting level:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to delete level",
+      },
+      { status: 500 }
+    );
+  }
+}
+`,
+  'utf8'
+);
+console.log('  ✓ src/app/api/admin/levels/route.ts');
+
+// Students API
+fs.writeFileSync(
+  path.join(baseDir, 'src/app/api/admin/students/route.ts'),
+  `import { prisma } from "@/lib/prisma";
+import { requireAdminSession } from "@/lib/require-admin";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const FilterSchema = z.object({
+  schoolId: z.string().optional(),
+  fieldId: z.string().optional(),
+  levelId: z.string().optional(),
+  approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+
+type ApiResponse<T = any> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { session, errorResponse } = await requireAdminSession();
+    if (errorResponse) return errorResponse;
+
+    const adminSchoolId = session.admin.schoolId;
+
+    const params = FilterSchema.parse({
+      schoolId: req.nextUrl.searchParams.get("schoolId"),
+      fieldId: req.nextUrl.searchParams.get("fieldId"),
+      levelId: req.nextUrl.searchParams.get("levelId"),
+      approvalStatus: req.nextUrl.searchParams.get("approvalStatus"),
+      page: req.nextUrl.searchParams.get("page"),
+      limit: req.nextUrl.searchParams.get("limit"),
+    });
+
+    // Verify schoolId matches admin's school
+    if (params.schoolId && params.schoolId !== adminSchoolId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You can only access your school's students",
+        },
+        { status: 403 }
+      );
+    }
+
+    const where: any = {
+      schoolId: adminSchoolId,
+    };
+
+    if (params.fieldId) {
+      where.fieldOfStudyId = params.fieldId;
+    }
+
+    if (params.levelId) {
+      where.levelId = params.levelId;
+    }
+
+    if (params.approvalStatus) {
+      where.approvalStatus = params.approvalStatus;
+    }
+
+    const skip = (params.page - 1) * params.limit;
+
+    const [students, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: params.limit,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          username: true,
+          profilePhoto: true,
+          schoolId: true,
+          fieldOfStudy: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          level: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          approvalStatus: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        students,
+        pagination: {
+          page: params.page,
+          limit: params.limit,
+          total,
+          pages: Math.ceil(total / params.limit),
+        },
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid query parameters: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error fetching students:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch students",
+      },
+      { status: 500 }
+    );
+  }
+}
+`,
+  'utf8'
+);
+console.log('  ✓ src/app/api/admin/students/route.ts');
+
+// Communities API
+fs.writeFileSync(
+  path.join(baseDir, 'src/app/api/communities/route.ts'),
+  `import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const CreateCommunitySchema = z.object({
+  userId: z.string().min(1),
+  name: z.string().min(1).max(100),
+  description: z.string().optional(),
+  photo: z.string().optional(),
+});
+
+const QuerySchema = z.object({
+  userId: z.string().optional(),
+  id: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+
+type ApiResponse<T = any> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { searchParams } = new URL(req.url);
+    const params = QuerySchema.parse({
+      userId: searchParams.get("userId"),
+      id: searchParams.get("id"),
+      page: searchParams.get("page"),
+      limit: searchParams.get("limit"),
+    });
+
+    // If community ID is provided, get community details
+    if (params.id) {
+      const community = await prisma.community.findUnique({
+        where: { id: params.id },
+        include: {
+          school: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          fieldOfStudy: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          level: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              profilePhoto: true,
+            },
+          },
+          members: {
+            take: 10,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  profilePhoto: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              members: true,
+            },
+          },
+        },
+      });
+
+      if (!community) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Community not found",
+          },
+          { status: 404 }
+        );
+      }
+
+      const isMember = params.userId
+        ? !!(await prisma.communityMember.findUnique({
+            where: {
+              userId_communityId: {
+                userId: params.userId,
+                communityId: params.id,
+              },
+            },
+          }))
+        : false;
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          ...community,
+          isMember,
+        },
+      });
+    }
+
+    // Get user's communities
+    if (!params.userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "userId is required when not fetching by id",
+        },
+        { status: 400 }
+      );
+    }
+
+    const skip = (params.page - 1) * params.limit;
+
+    const [communities, total] = await Promise.all([
+      prisma.communityMember.findMany({
+        where: { userId: params.userId },
+        skip,
+        take: params.limit,
+        orderBy: { joinedAt: "desc" },
+        include: {
+          community: {
+            include: {
+              school: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              fieldOfStudy: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              level: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              _count: {
+                select: {
+                  members: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.communityMember.count({
+        where: { userId: params.userId },
+      }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        communities: communities.map((m) => m.community),
+        pagination: {
+          page: params.page,
+          limit: params.limit,
+          total,
+          pages: Math.ceil(total / params.limit),
+        },
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid query parameters: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error fetching communities:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch communities",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const body = await req.json();
+    const { userId, name, description, photo } = CreateCommunitySchema.parse(body);
+
+    // Verify user exists and get their school
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, schoolId: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "User not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (!user.schoolId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "User must belong to a school",
+        },
+        { status: 400 }
+      );
+    }
+
+    const community = await prisma.community.create({
+      data: {
+        name,
+        description,
+        photo,
+        type: "STUDENT_CREATED",
+        schoolId: user.schoolId,
+        creatorId: userId,
+      },
+      include: {
+        school: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            members: true,
+          },
+        },
+      },
+    });
+
+    // Add creator as owner
+    await prisma.communityMember.create({
+      data: {
+        userId,
+        communityId: community.id,
+        role: "OWNER",
+      },
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: community,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid input: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error creating community:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to create community",
+      },
+      { status: 500 }
+    );
+  }
+}
+`,
+  'utf8'
+);
+console.log('  ✓ src/app/api/communities/route.ts');
+
+// Registration Fields API
+fs.writeFileSync(
+  path.join(baseDir, 'src/app/api/auth/registration-fields/route.ts'),
+  `import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const QuerySchema = z.object({
+  schoolId: z.string().min(1),
+});
+
+type ApiResponse<T = any> = {
+  success: boolean;
+  data?: T;
+  error?: string;
+};
+
+export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+  try {
+    const { searchParams } = new URL(req.url);
+    const { schoolId } = QuerySchema.parse({
+      schoolId: searchParams.get("schoolId"),
+    });
+
+    // Verify school exists
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+    });
+
+    if (!school) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "School not found",
+        },
+        { status: 404 }
+      );
+    }
+
+    const [fields, levels] = await Promise.all([
+      prisma.fieldOfStudy.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.level.findMany({
+        where: { schoolId },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          order: true,
+        },
+        orderBy: { order: "asc" },
+      }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        fields,
+        levels,
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid query parameters: " + error.errors.map((e) => e.message).join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error fetching registration fields:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch registration fields",
+      },
+      { status: 500 }
+    );
+  }
+}
+`,
+  'utf8'
+);
+console.log('  ✓ src/app/api/auth/registration-fields/route.ts');
+
+console.log('\n✅ All API route files created successfully!');

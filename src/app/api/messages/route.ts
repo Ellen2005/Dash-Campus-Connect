@@ -8,7 +8,7 @@ const SendMessageSchema = z.object({
   senderId: z.string(),
   recipient: z.string().optional(),
   chatGroupId: z.string().optional(),
-  content: z.string().min(1).max(2000),
+  content: z.string().max(2000).optional(),
   images: z.array(z.string()).default([]),
   voiceUrl: z.string().optional(),
 })
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { senderId, recipient, chatGroupId, content, images, voiceUrl } = SendMessageSchema.parse(body)
+    const trimmedContent = (content ?? '').trim()
 
     // Validate that either recipient or chatGroupId is provided
     if (!recipient && !chatGroupId) {
@@ -145,6 +146,10 @@ export async function POST(request: NextRequest) {
 
     if (recipient && chatGroupId) {
       return NextResponse.json({ error: 'Cannot specify both recipient and chatGroupId' }, { status: 400 })
+    }
+
+    if (!trimmedContent && images.length === 0 && !voiceUrl) {
+      return NextResponse.json({ error: 'Message must contain text, attachment, or audio.' }, { status: 400 })
     }
 
     // For direct messages, check if recipient exists
@@ -180,7 +185,7 @@ export async function POST(request: NextRequest) {
         senderId,
         recipient,
         chatGroupId,
-        content,
+        content: trimmedContent || '(attachment)',
         images,
         voiceUrl,
       },

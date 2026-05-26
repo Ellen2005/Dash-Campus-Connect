@@ -16,19 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { DashLogo } from "@/components/shared/dash-logo";
 import { useI18n } from "@/lib/i18n";
-
-const mockPending = [
-  { id: "1", name: "Alex Rivera",  studentId: "2024ENG001", email: "arivera@demo.edu",  faculty: "Engineering", year: "3", joined: "2 hours ago" },
-  { id: "2", name: "Sarah Chen",   studentId: "2024BIO042", email: "schen@demo.edu",    faculty: "Biology",     year: "2", joined: "5 hours ago" },
-  { id: "3", name: "Mike Johnson", studentId: "2023BUS019", email: "mjohnson@demo.edu", faculty: "Business",    year: "4", joined: "1 day ago" },
-  { id: "4", name: "Priya Sharma", studentId: "2024MED007", email: "psharm@demo.edu",   faculty: "Medicine",    year: "1", joined: "1 day ago" },
-];
-
-const mockStudents = [
-  { id: "s1", name: "Jordan Lee",    studentId: "2022ART015", email: "jlee@demo.edu",    role: "student",       status: "active",    faculty: "Arts" },
-  { id: "s2", name: "Kwame Asante",  studentId: "2021ENG003", email: "kasante@demo.edu", role: "student_admin", status: "active",    faculty: "Engineering" },
-  { id: "s3", name: "Fatima Diallo", studentId: "2023LAW011", email: "fdiallo@demo.edu", role: "student",       status: "suspended", faculty: "Law" },
-];
+import { mergeWithMock } from "@/lib/mock-data";
 
 const mockFlags = [
   { id: "f1", user: "anon_user", reason: "Harassment",          reports: 5, time: "10m ago" },
@@ -36,12 +24,42 @@ const mockFlags = [
   { id: "f3", user: "user_xyz",  reason: "Inappropriate Media", reports: 8, time: "2h ago" },
 ];
 
+const mockPending: PendingUser[] = [
+  { id: "mock-p1", name: "Alex Rivera", studentId: "2024ENG001", faculty: "Engineering", year: "3", joined: "2 hours ago" },
+  { id: "mock-p2", name: "Sarah Chen", studentId: "2024BIO042", faculty: "Biology", year: "2", joined: "5 hours ago" },
+];
+
+const mockStudents: SchoolUser[] = [
+  { id: "mock-s1", name: "Jordan Lee", studentId: "2022ART015", role: "student", status: "active", faculty: "Arts" },
+  { id: "mock-s2", name: "Kwame Asante", studentId: "2021ENG003", role: "student_admin", status: "active", faculty: "Engineering" },
+];
+
+type PendingUser = {
+  id: string;
+  name: string;
+  studentId: string;
+  username?: string;
+  faculty?: string;
+  year?: string;
+  joined?: string;
+};
+
+type SchoolUser = {
+  id: string;
+  name: string;
+  studentId: string;
+  faculty?: string;
+  year?: string;
+  role?: "student" | "student_admin" | "admin";
+  status?: "active" | "suspended" | "pending";
+};
+
 export default function AdminPortalPage() {
   const { toast } = useToast();
   const { t } = useI18n();
-  const [pendingList, setPendingList] = useState(mockPending);
-  const [students, setStudents] = useState(mockStudents);
-  const [flags, setFlags] = useState(mockFlags);
+  const [pendingList, setPendingList] = useState<PendingUser[]>(mergeWithMock([], mockPending));
+  const [students, setStudents] = useState<SchoolUser[]>(mergeWithMock([], mockStudents));
+  const [flags, setFlags] = useState(mergeWithMock([], mockFlags));
   const [search, setSearch] = useState("");
   const [announceOpen, setAnnounceOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -49,18 +67,61 @@ export default function AdminPortalPage() {
   const [requireApproval, setRequireApproval] = useState(true);
   const [adminSchoolId, setAdminSchoolId] = useState<string | null>(null);
   const [adminSchoolName, setAdminSchoolName] = useState<string | null>(null);
+  const [schoolNameInput, setSchoolNameInput] = useState("");
+  const [allowedDomainInput, setAllowedDomainInput] = useState("");
+  const [schoolSaving, setSchoolSaving] = useState(false);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState("");
 
   useEffect(() => {
-    try {
-      setAdminSchoolId(localStorage.getItem("dash_admin_schoolId"));
-      setAdminSchoolName(localStorage.getItem("dash_admin_schoolName"));
-    } catch {
-      setAdminSchoolId(null);
-      setAdminSchoolName(null);
-    }
+    const run = async () => {
+      try {
+        const res = await fetch("/api/admin-portal/me", { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        const school = json?.school;
+        if (school?.id) {
+          setAdminSchoolId(school.id);
+          setAdminSchoolName(school.name ?? school.id);
+          setRequireApproval(!!school.requireApproval);
+          setSchoolNameInput(school.name ?? "");
+          setAllowedDomainInput(school.allowedDomain ?? "");
+        } else {
+          setAdminSchoolId(null);
+          setAdminSchoolName(null);
+        }
+      } catch {
+        setAdminSchoolId(null);
+        setAdminSchoolName(null);
+      }
+    };
+    run();
   }, []);
+
+  const saveSchoolSettings = async () => {
+    setSchoolSaving(true);
+    try {
+      const res = await fetch("/api/admin-portal/update-school", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: schoolNameInput.trim(),
+          allowedDomain: allowedDomainInput.trim() || null,
+          requireApproval,
+        }),
+      });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        toast({ title: "Save failed", description: json?.error ?? "Please try again." });
+        return;
+      }
+      setAdminSchoolName(json?.school?.name ?? adminSchoolName);
+      toast({ title: "Saved", description: "School settings updated." });
+    } catch {
+      toast({ title: "Save failed", description: "Network error." });
+    } finally {
+      setSchoolSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!adminSchoolId) return;
@@ -69,14 +130,14 @@ export default function AdminPortalPage() {
       setPendingError("");
       setPendingLoading(true);
       try {
-        const res = await fetch(`/api/admin/pending-users?schoolId=${encodeURIComponent(adminSchoolId)}`);
+        const res = await fetch(`/api/admin/pending-users`, { cache: "no-store" });
         const json = await res.json().catch(() => ({} as any));
         if (!res.ok) {
           setPendingError(json?.error ?? "Failed to load pending approvals.");
           return;
         }
         if (Array.isArray(json?.users)) {
-          setPendingList(json.users);
+          setPendingList(mergeWithMock(json.users, mockPending));
         }
       } catch {
         setPendingError("Network error while loading pending approvals.");
@@ -85,6 +146,20 @@ export default function AdminPortalPage() {
       }
     };
 
+    run();
+  }, [adminSchoolId]);
+
+  useEffect(() => {
+    if (!adminSchoolId) return;
+    const run = async () => {
+      try {
+        const res = await fetch("/api/admin/users", { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        if (res.ok && Array.isArray(json?.users)) setStudents(mergeWithMock(json.users, mockStudents));
+      } catch {
+        // ignore for now
+      }
+    };
     run();
   }, [adminSchoolId]);
 
@@ -109,7 +184,7 @@ export default function AdminPortalPage() {
       }
     }
     setPendingList(l => l.filter(p => p.id !== id));
-    setStudents(prev => [...prev, { id: `s${Date.now()}`, name: s.name, studentId: s.studentId, email: "", role: "student", status: "active", faculty: s.faculty }]);
+    setStudents(prev => [...prev, { id, name: s.name, studentId: s.studentId, role: "student", status: "active", faculty: s.faculty, year: s.year }]);
     toast({ title: `✅ ${s.name} ${t("approveStudent").toLowerCase()}`, description: "They can now access the campus platform." });
   };
 
@@ -138,41 +213,78 @@ export default function AdminPortalPage() {
   };
 
   const toggleRole = (id: string) => {
-    const s = students.find(s => s.id === id)!;
-    setStudents(prev => prev.map(x => x.id === id ? { ...x, role: x.role === "student" ? "student_admin" : "student" } : x));
-    toast({ title: s.role === "student" ? `⭐ ${t("makeAdmin")}` : `↩ ${t("removeAdmin")}`, description: s.name });
+    const s = students.find(s => s.id === id);
+    if (!s) return;
+    const nextRole = s.role === "student_admin" ? "student" : "student_admin";
+    fetch("/api/admin/update-user", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: id, role: nextRole }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({} as any));
+        toast({ title: "Update failed", description: json?.error ?? "Please try again." });
+        return;
+      }
+      setStudents(prev => prev.map(x => x.id === id ? { ...x, role: nextRole } : x));
+      toast({ title: nextRole === "student_admin" ? `⭐ ${t("makeAdmin")}` : `↩ ${t("removeAdmin")}`, description: s.name });
+    }).catch(() => toast({ title: "Update failed", description: "Network error." }));
   };
 
   const toggleStatus = (id: string) => {
-    setStudents(prev => prev.map(s => s.id === id ? { ...s, status: s.status === "active" ? "suspended" : "active" } : s));
+    const s = students.find(s => s.id === id);
+    if (!s) return;
+    const nextStatus = s.status === "suspended" ? "active" : "suspended";
+    fetch("/api/admin/update-user", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: id, status: nextStatus }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({} as any));
+        toast({ title: "Update failed", description: json?.error ?? "Please try again." });
+        return;
+      }
+      setStudents(prev => prev.map(x => x.id === id ? { ...x, status: nextStatus } : x));
+    }).catch(() => toast({ title: "Update failed", description: "Network error." }));
   };
 
   const resolveFlag = (id: string) => setFlags(f => f.filter(x => x.id !== id));
 
   const signOutAdmin = () => {
-    try {
-      localStorage.removeItem("dash_admin_schoolId");
-      localStorage.removeItem("dash_admin_schoolName");
-    } catch {
-      // ignore
-    }
-    window.location.href = "/admin-portal/login";
+    fetch("/api/admin-portal/logout", { method: "POST" })
+      .catch(() => {})
+      .finally(() => { window.location.href = "/admin-portal/login"; });
   };
 
   const sendAnnouncement = () => {
     if (!announcement.trim()) return;
     setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      setAnnounceOpen(false);
-      setAnnouncement("");
-      toast({ title: `📢 ${t("announcementBroadcast")}`, description: t("allStudentsNotified") });
-    }, 1200);
+    fetch("/api/admin/broadcast", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: announcement.trim() }),
+    })
+      .then(async (res) => {
+        const json = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          toast({ title: "Broadcast failed", description: json?.error ?? "Please try again." });
+          return;
+        }
+        setAnnounceOpen(false);
+        setAnnouncement("");
+        toast({
+          title: `📢 ${t("announcementBroadcast")}`,
+          description: `Sent to ${json?.delivered ?? 0} students.`,
+        });
+      })
+      .catch(() => toast({ title: "Broadcast failed", description: "Network error." }))
+      .finally(() => setSending(false));
   };
 
   const filteredStudents = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase())
+    (s.studentId ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const stats = [
@@ -379,11 +491,11 @@ export default function AdminPortalPage() {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("schoolName")}</Label>
-                  <Input defaultValue="Demo University" className="h-9 text-sm bg-muted/30" />
+                  <Input value={schoolNameInput} onChange={e => setSchoolNameInput(e.target.value)} className="h-9 text-sm bg-muted/30" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("allowedDomain")}</Label>
-                  <Input defaultValue="demo.edu" className="h-9 text-sm bg-muted/30" placeholder="e.g. university.edu or uni.ac.cm" />
+                  <Input value={allowedDomainInput} onChange={e => setAllowedDomainInput(e.target.value)} className="h-9 text-sm bg-muted/30" placeholder="e.g. university.edu or uni.ac.cm" />
                   <p className="text-[10px] text-muted-foreground">{t("domainNote")}</p>
                 </div>
                 <div className="space-y-1.5">
@@ -396,7 +508,9 @@ export default function AdminPortalPage() {
                     <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
                   </div>
                 </div>
-                <Button className="dash-button-primary h-9 px-4 text-sm">{t("saveSettings")}</Button>
+                <Button className="dash-button-primary h-9 px-4 text-sm" onClick={saveSchoolSettings} disabled={schoolSaving || !adminSchoolId}>
+                  {schoolSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : t("saveSettings")}
+                </Button>
               </div>
             </div>
           </TabsContent>
