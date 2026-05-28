@@ -32,13 +32,20 @@ Once your project is ready:
 ### 1.3 Set Up Your Database (Option A: Run SQL Directly)
 **This is the easiest method if you have database connection issues.**
 
+**Step 1: Clean Old Database (if you have existing tables)**
+If you previously had tables in your Supabase database, you need to drop them first:
 1. Go to the **SQL Editor** in Supabase
-2. Copy the entire contents of `prisma/full_schema.sql` from your project
+2. Copy the entire contents of `prisma/drop_all_tables.sql`
 3. Paste it into the SQL Editor
-4. Click **Run** to execute the script
-5. All tables, indexes, and foreign keys will be created
+4. Click **Run** - This will drop all old tables and enums
 
-**Note:** If you already have existing tables from a previous setup, you may need to drop them first or run a migration diff. The `full_schema.sql` file contains the complete schema.
+**Step 2: Create New Schema**
+1. In the same SQL Editor, copy the entire contents of `prisma/full_schema.sql`
+2. Paste it into the SQL Editor (you can clear the previous script first)
+3. Click **Run** to execute the script
+4. All tables, indexes, and foreign keys will be created
+
+**Note:** The `drop_all_tables.sql` and `full_schema.sql` scripts replace the old migration files (`0001_init`, `0002_full_schema`) and `manual-init.sql` which have been removed from the project.
 
 ### 1.3 Set Up Your Database (Option B: Use Prisma Migrations)
 If you prefer using Prisma migrations:

@@ -238,7 +238,12 @@ export default function RegisterPage() {
                   <SelectValue placeholder={t("selectUniversity")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {schools.map(s => (
+                  {schools.length === 0 && !schoolsLoading && (
+                <SelectItem value="__none__" disabled>
+                  No schools registered yet — ask your admin
+                </SelectItem>
+              )}
+              {schools.map(s => (
                     <SelectItem key={s.id} value={s.id}>
                       <div className="flex items-center gap-2">
                         <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
