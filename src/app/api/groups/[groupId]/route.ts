@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
@@ -28,8 +27,8 @@ export async function GET(
                 name: true,
                 profilePhoto: true,
                 username: true,
-                major: true,
-                year: true,
+                fieldOfStudy: { select: { name: true } },
+                level: { select: { name: true } },
               },
             },
           },

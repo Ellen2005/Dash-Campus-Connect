@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { ServerSidebar, ChannelSidebar } from "@/components/layout/discord-sidebar";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Search, X, Settings, Shield, MessageCircle, Loader2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Search, X, Settings, Shield, MessageCircle, Loader2, Users, Globe } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { DashLogo } from "@/components/shared/dash-logo";
 import { useAuth } from "@/lib/auth-context";
+
+type SuggestedUser = { id: string; name: string; username: string; profilePhoto?: string };
 
 const mobileNavItems = (t: (k: any) => string) => [
   { href: "/main",              icon: Home,        label: t("feed") },
@@ -21,6 +23,7 @@ const mobileNavItems = (t: (k: any) => string) => [
 
 const drawerLinks = (t: (k: any) => string) => [
   { href: "/main",              icon: Home,        label: t("feed") },
+  { href: "/main/communities",  icon: Globe,       label: "Communities" },
   { href: "/main/events",       icon: CalendarDays,label: t("events") },
   { href: "/main/marketplace",  icon: ShoppingBag, label: t("market") },
   { href: "/main/lost-found",   icon: Search,      label: t("lostFound") },
@@ -37,8 +40,46 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, dashUser, loading, signOut } = useAuth();
   const canAccessAdmin = dashUser?.role === "student_admin" || dashUser?.role === "admin";
+  const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const navItems = mobileNavItems(t);
+
+  // Fetch suggested users (people current user doesn't follow)
+  useEffect(() => {
+    if (!dashUser?.id) return;
+    const fetchSuggested = async () => {
+      try {
+        const res = await fetch(`/api/search?q=&currentUserId=${encodeURIComponent(dashUser.id)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({ users: [] }));
+        const others = (json.users ?? []).filter(
+          (u: any) => u.id !== dashUser.id && u.status !== "connected"
+        ).slice(0, 3);
+        setSuggestedUsers(others);
+      } catch {
+        // silently fail — sidebar is not critical
+      }
+    };
+    void fetchSuggested();
+  }, [dashUser?.id]);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    if (!dashUser?.id) return;
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`/api/notifications/unread?userId=${encodeURIComponent(dashUser.id)}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({ count: 0 }));
+        setUnreadCount(json.count ?? 0);
+      } catch {
+        // silently fail
+      }
+    };
+    void fetchUnread();
+    // Poll every 60s
+    const interval = setInterval(fetchUnread, 60_000);
+    return () => clearInterval(interval);
+  }, [dashUser?.id]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -114,10 +155,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 <Search className="w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/main/notifications">
+                      <Link href="/main/notifications">
               <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground">
                 <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
+                )}
               </Button>
             </Link>
             <Link href="/main/messages">
@@ -172,44 +215,44 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("trending")}</h3>
           </div>
           {[
-            { tag: "#Hackathon2025", posts: "1.2k" },
-            { tag: "#FinalsWeek",    posts: "850" },
-            { tag: "#CampusVote",    posts: "420" },
-            { tag: "#LostAndFound",  posts: "120" },
+            { tag: "#CampusLife",   posts: "Live" },
+            { tag: "#StudyGroup",   posts: "Active" },
+            { tag: "#LostAndFound", posts: "New" },
+            { tag: "#Events",       posts: "Today" },
           ].map((trend) => (
-            <div key={trend.tag} className="group cursor-pointer">
-              <p className="text-sm font-semibold text-primary group-hover:underline">{trend.tag}</p>
-              <p className="text-[10px] text-muted-foreground">{trend.posts} posts</p>
-            </div>
+            <Link key={trend.tag} href="/main/search">
+              <div className="group cursor-pointer">
+                <p className="text-sm font-semibold text-primary group-hover:underline">{trend.tag}</p>
+                <p className="text-[10px] text-muted-foreground">{trend.posts}</p>
+              </div>
+            </Link>
           ))}
         </div>
 
-        <div className="dash-card p-4 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("suggested")}</h3>
-          {[
-            { name: "Dr. Sarah Miller",    username: "sarahm",  verified: true },
-            { name: "Engineering Society", username: "eng_soc", verified: true },
-            { name: "Jake Thompson",       username: "jake_t",  verified: false },
-          ].map((u) => (
-            <div key={u.username} className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Avatar className="w-7 h-7 shrink-0">
-                  <AvatarFallback className="text-[10px] bg-primary/15 text-primary">{u.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-semibold truncate">{u.name}</p>
-                    {u.verified && <span className="verified-badge shrink-0">✓</span>}
+        {suggestedUsers.length > 0 && (
+          <div className="dash-card p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t("suggested")}</h3>
+            {suggestedUsers.map((u) => (
+              <Link key={u.username} href={`/main/profile/${u.username}`}>
+                <div className="flex items-center justify-between gap-2 group cursor-pointer">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Avatar className="w-7 h-7 shrink-0">
+                      {u.profilePhoto && <AvatarImage src={u.profilePhoto} />}
+                      <AvatarFallback className="text-[10px] bg-primary/15 text-primary">{u.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold truncate group-hover:text-primary transition-colors">{u.name}</p>
+                      <p className="text-[10px] text-muted-foreground">@{u.username}</p>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">@{u.username}</p>
+                  <Button size="sm" variant="outline" className="h-6 text-[10px] px-2.5 rounded-full border-primary/40 text-primary hover:bg-primary/10 shrink-0">
+                    {t("following2")}
+                  </Button>
                 </div>
-              </div>
-              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2.5 rounded-full border-primary/40 text-primary hover:bg-primary/10 shrink-0">
-                {t("following2")}
-              </Button>
-            </div>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </aside>
 
       {/* Mobile Drawer */}
@@ -248,7 +291,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
             {/* Nav links */}
             <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
-              {[...drawerLinks(t), ...(canAccessAdmin ? [{ href: "/main/admin", icon: Shield, label: t("admin") }] : [])].map(({ href, icon: Icon, label }) => {
+              {[...drawerLinks(t),
+                ...(canAccessAdmin ? [
+                  { href: "/main/student-admin", icon: Shield, label: "Student Admin" },
+                  { href: "/main/admin-chat", icon: Shield, label: "Admin Chat" },
+                  { href: "/main/admin", icon: Shield, label: t("admin") },
+                ] : [])
+              ].map(({ href, icon: Icon, label }) => {
                 const active = pathname === href || (href !== "/main" && pathname.startsWith(href));
                 return (
                   <Link

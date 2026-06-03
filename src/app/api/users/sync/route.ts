@@ -10,6 +10,9 @@ const SyncUserSchema = z.object({
   faculty: z.string().optional(),
   year: z.string().optional(),
   avatar: z.string().optional(),
+  schoolId: z.string().optional(),
+  fieldOfStudyId: z.string().optional(),
+  levelId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -25,27 +28,37 @@ export async function POST(request: NextRequest) {
         email,
         name: data.fullName,
         username: data.username,
-        major: data.faculty ?? undefined,
-        year: data.year ?? undefined,
         profilePhoto: data.avatar ?? undefined,
+        schoolId: data.schoolId || undefined,
+        fieldOfStudyId: data.fieldOfStudyId || undefined,
+        levelId: data.levelId || undefined,
       },
       create: {
         id: data.id,
         email,
         name: data.fullName,
         username: data.username,
-        major: data.faculty ?? undefined,
-        year: data.year ?? undefined,
         profilePhoto: data.avatar ?? undefined,
+        schoolId: data.schoolId || undefined,
+        fieldOfStudyId: data.fieldOfStudyId || undefined,
+        levelId: data.levelId || undefined,
+        approvalStatus: 'PENDING',
       },
       select: {
         id: true,
         email: true,
         name: true,
         username: true,
-        major: true,
-        year: true,
         profilePhoto: true,
+        schoolId: true,
+        fieldOfStudyId: true,
+        levelId: true,
+        fieldOfStudy: {
+          select: { name: true },
+        },
+        level: {
+          select: { name: true },
+        },
       },
     });
 

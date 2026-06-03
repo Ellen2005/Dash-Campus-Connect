@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +16,7 @@ import {
   Megaphone,
   Filter,
   CheckCircle2,
-  XCircle
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,13 +24,80 @@ const SCAM_KEYWORDS = ["fast cash", "crypto", "investment opportunity", "wire tr
 
 export default function AdminDashboard() {
   const [resolvedItems, setResolvedItems] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState([
+    { label: "Total Students", value: "—", icon: Users, color: "text-primary", trend: "Loading..." },
+    { label: "Posts Today",     value: "—", icon: FileText, color: "text-primary",  trend: "Loading..." },
+    { label: "Flagged Content", value: "—", icon: AlertTriangle, color: "text-destructive", trend: "Loading..." },
+    { label: "Open Tickets",   value: "—", icon: HelpCircle, color: "text-primary",  trend: "Loading..." },
+  ]);
 
-  const stats = [
-    { label: "Total Students", value: "8,432", icon: Users, color: "text-primary",     trend: "+12% this week" },
-    { label: "Posts Today",     value: "1,240", icon: FileText, color: "text-primary",  trend: "+5% vs yesterday" },
-    { label: "Flagged Content", value: "14",    icon: AlertTriangle, color: "text-destructive", trend: "7 high priority" },
-    { label: "Open Tickets",   value: "42",    icon: HelpCircle, color: "text-primary",  trend: "12 waiting > 24h" },
-  ];
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [usersRes, postsRes, flagsRes, ticketsRes] = await Promise.all([
+          fetch("/api/admin/users?status=active", { cache: "no-store" }),
+          fetch("/api/posts?limit=1&today=true", { cache: "no-store" }).catch(() => null),
+          fetch("/api/moderation/flags?status=PENDING", { cache: "no-store" }).catch(() => null),
+          fetch("/api/support?status=OPEN", { cache: "no-store" }).catch(() => null),
+        ]);
+
+        const usersJson = await usersRes.json().catch(() => ({}));
+        const usersCount = Array.isArray(usersJson?.users) ? usersJson.users.length : "—";
+        const usersTrend = typeof usersCount === "number" ? `${usersCount} active students` : "Loading...";
+
+        // Posts - estimate from count header or length
+        let postsCount = "—";
+        let postsTrend = "Loading...";
+        if (postsRes?.ok) {
+          const postsJson = await postsRes.json().catch(() => ({}));
+          if (Array.isArray(postsJson?.posts)) {
+            postsCount = postsJson.posts.length;
+            postsTrend = `${postsCount} today`;
+          }
+        }
+
+        // Flags
+        let flagsCount = "—";
+        let flagsTrend = "Loading...";
+        if (flagsRes?.ok) {
+          const flagsJson = await flagsRes.json().catch(() => ({}));
+          if (Array.isArray(flagsJson?.flags)) {
+            flagsCount = flagsJson.flags.length;
+            flagsTrend = `${flagsCount} pending review`;
+          }
+        }
+
+        // Tickets
+        let ticketsCount = "—";
+        let ticketsTrend = "Loading...";
+        if (ticketsRes?.ok) {
+          const ticketsJson = await ticketsRes.json().catch(() => ({}));
+          if (Array.isArray(ticketsJson?.tickets)) {
+            ticketsCount = ticketsJson.tickets.length;
+            const oldTickets = ticketsJson.tickets.filter((t: any) => {
+              const age = Date.now() - new Date(t.createdAt).getTime();
+              return age > 24 * 60 * 60 * 1000;
+            }).length;
+            ticketsTrend = `${oldTickets} waiting > 24h`;
+          }
+        }
+
+        setStats([
+          { label: "Total Students", value: String(usersCount), icon: Users, color: "text-primary", trend: usersTrend },
+          { label: "Posts Today", value: String(postsCount), icon: FileText, color: "text-primary", trend: postsTrend },
+          { label: "Flagged Content", value: String(flagsCount), icon: AlertTriangle, color: "text-destructive", trend: flagsTrend },
+          { label: "Open Tickets", value: String(ticketsCount), icon: HelpCircle, color: "text-primary", trend: ticketsTrend },
+        ]);
+      } catch {
+        // Keep default state
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadStats();
+  }, []);
 
   const flaggedItems = [
     { id: 1, user: "jdoe23", reason: "Potential Spam", reports: 4, timestamp: "10m ago", priority: "high" },
@@ -60,28 +126,34 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <Card
-            key={stat.label}
-            className="dash-card-hover animate-in fade-in slide-in-from-bottom-4 duration-500"
-            style={{ animationDelay: `${i * 80}ms` }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-2 rounded-lg bg-card/50 border ${stat.color}`}>
-                  <stat.icon className="w-5 h-5" />
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading analytics...
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, i) => (
+            <Card
+              key={stat.label}
+              className="dash-card-hover animate-in fade-in slide-in-from-bottom-4 duration-500"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-2 rounded-lg bg-card/50 border ${stat.color}`}>
+                    <stat.icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</span>
                 </div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{stat.label}</span>
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-2xl font-headline font-bold animate-count-up" style={{ animationDelay: `${i * 80 + 200}ms` }}>{stat.value}</h3>
-                <p className="text-[10px] text-muted-foreground">{stat.trend}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-headline font-bold animate-count-up" style={{ animationDelay: `${i * 80 + 200}ms` }}>{stat.value}</h3>
+                  <p className="text-[10px] text-muted-foreground">{stat.trend}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 dash-card-hover animate-in fade-in slide-in-from-left-4 duration-500 delay-200">
@@ -146,9 +218,9 @@ export default function AdminDashboard() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 {[
-                  { label: "Server Response", value: "48ms", status: "good" },
-                  { label: "FCM Push Success", value: "98.2%", status: "good" },
-                  { label: "Active Sessions", value: "1,452", status: "neutral" },
+                  { label: "Server Response", value: "48ms", status: "good" as const },
+                  { label: "FCM Push Success", value: "98.2%", status: "good" as const },
+                  { label: "Active Sessions", value: "1,452", status: "neutral" as const },
                 ].map((metric) => (
                   <div key={metric.label} className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{metric.label}</span>

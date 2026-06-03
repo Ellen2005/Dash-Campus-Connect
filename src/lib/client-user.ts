@@ -9,6 +9,9 @@ export interface ClientDashUser {
   faculty: string;
   year: string;
   avatar?: string;
+  schoolId?: string;
+  fieldOfStudyId?: string;
+  levelId?: string;
 }
 
 export async function ensureDbUser(dashUser: ClientDashUser, session?: Session | null) {
@@ -24,6 +27,9 @@ export async function ensureDbUser(dashUser: ClientDashUser, session?: Session |
       faculty: dashUser.faculty,
       year: dashUser.year,
       avatar: dashUser.avatar,
+      schoolId: dashUser.schoolId,
+      fieldOfStudyId: dashUser.fieldOfStudyId,
+      levelId: dashUser.levelId,
     }),
   });
 

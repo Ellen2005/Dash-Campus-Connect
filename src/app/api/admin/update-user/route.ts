@@ -52,6 +52,17 @@ export async function POST(req: NextRequest) {
   const { error: updateErr } = await supabase.auth.admin.updateUserById(userId, { user_metadata: nextMeta });
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
+  // Sync isStudentAdmin to Prisma DB
+  if (role) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      await prisma.user.updateMany({
+        where: { id: userId },
+        data: { isStudentAdmin: role === "student_admin" },
+      });
+    } catch { /* non-fatal */ }
+  }
+
   return NextResponse.json({ success: true }, { status: 200 });
 }
 

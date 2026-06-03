@@ -3,26 +3,39 @@
 import { cn } from "@/lib/utils";
 import {
   Hash, Settings, Plus, Shield, Megaphone,
-  ShoppingBag, Search, BookOpen, LifeBuoy, Users, Bell, MessageCircle
+  ShoppingBag, Search, BookOpen, LifeBuoy, Bell, MessageCircle, Globe, ShieldCheck, Users
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import { DashLogo } from "@/components/shared/dash-logo";
 import { useAuth } from "@/lib/auth-context";
+import { useEffect, useState } from "react";
 
-const communities = [
-  { id: "home", label: "CG",  href: "/main" },
-  { id: "cs",   label: "CS",  href: "/main" },
-  { id: "ws",   label: "WS",  href: "/main" },
-  { id: "26",   label: "'26", href: "/main" },
-];
+type MyCommunity = { id: string; name: string };
 
 export function ServerSidebar() {
   const pathname = usePathname();
   const { t } = useI18n();
   const { dashUser } = useAuth();
   const canAccessAdmin = dashUser?.role === "student_admin" || dashUser?.role === "admin";
+  const [myCommunities, setMyCommunities] = useState<MyCommunity[]>([]);
+
+  useEffect(() => {
+    if (!dashUser?.schoolId || !dashUser?.id) return;
+    fetch(`/api/communities?schoolId=${dashUser.schoolId}&userId=${dashUser.id}`, { cache: "no-store" })
+      .then(r => r.json()).catch(() => ({}))
+      .then(json => {
+        if (Array.isArray(json?.communities)) {
+          setMyCommunities(
+            json.communities
+              .filter((c: any) => c.isMember)
+              .slice(0, 5)
+              .map((c: any) => ({ id: c.id, name: c.name }))
+          );
+        }
+      });
+  }, [dashUser?.schoolId, dashUser?.id]);
 
   return (
     <div className="w-[64px] hidden md:flex flex-col items-center py-3 gap-1 sidebar-bg border-r h-full">
@@ -39,12 +52,17 @@ export function ServerSidebar() {
 
       <div className="w-6 h-px bg-border my-1" />
 
-      {/* Communities */}
+      {/* My Communities */}
       <div className="flex-1 flex flex-col items-center gap-1 w-full overflow-y-auto no-scrollbar">
-        {communities.map((c) => {
-          const isActive = pathname === "/main" && c.id === "home";
+        {myCommunities.length === 0 ? (
+          <div className="w-11 h-11 rounded-2xl bg-muted/30 flex items-center justify-center text-muted-foreground">
+            <Users className="w-4 h-4" />
+          </div>
+        ) : myCommunities.map((c) => {
+          const isActive = pathname === `/main/communities/${c.id}`;
+          const label = c.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
           return (
-            <Link key={c.id} href={c.href} className="group relative flex items-center justify-center w-full">
+            <Link key={c.id} href={`/main/communities/${c.id}`} className="group relative flex items-center justify-center w-full" title={c.name}>
               <ActivePill show={isActive} />
               <div className={cn(
                 "w-11 h-11 flex items-center justify-center font-bold text-xs transition-all duration-200",
@@ -52,13 +70,13 @@ export function ServerSidebar() {
                   ? "rounded-xl bg-primary/15 text-primary border border-primary/30"
                   : "rounded-2xl bg-secondary text-secondary-foreground group-hover:rounded-xl group-hover:bg-primary/10 group-hover:text-primary"
               )}>
-                {c.label}
+                {label}
               </div>
             </Link>
           );
         })}
 
-        <Link href="/main/groups?create=true" className="group relative flex items-center justify-center w-full mt-1" title="Create community">
+        <Link href="/main/communities" className="group relative flex items-center justify-center w-full mt-1" title="All communities">
           <div className="w-11 h-11 rounded-2xl border border-dashed border-border flex items-center justify-center text-muted-foreground transition-all duration-200 group-hover:rounded-xl group-hover:border-primary/40 group-hover:text-primary group-hover:bg-primary/8">
             <Plus className="w-4 h-4" />
           </div>
@@ -73,6 +91,9 @@ export function ServerSidebar() {
         <SidebarIconBtn href="/main/messages"      icon={MessageCircle} label={t("messages")} pathname={pathname} />
         <SidebarIconBtn href="/main/search"        icon={Search}   label={t("search")} pathname={pathname} />
         <SidebarIconBtn href="/main/support" icon={LifeBuoy} label={t("support")} pathname={pathname} />
+        {canAccessAdmin && (
+          <SidebarIconBtn href="/main/admin-chat" icon={ShieldCheck} label="Admin Chat" pathname={pathname} danger />
+        )}
         {canAccessAdmin && (
           <SidebarIconBtn href="/main/admin" icon={Shield} label={t("admin")} pathname={pathname} danger />
         )}
@@ -123,7 +144,7 @@ export function ChannelSidebar() {
     {
       name: "CAMPUS",
       channels: [
-        { name: t("feed"),        icon: Megaphone,   href: "/main",             badge: "3" },
+        { name: t("feed"),        icon: Megaphone,   href: "/main" },
         { name: "general",        icon: Hash,        href: "/main" },
         { name: t("events"),      icon: BookOpen,    href: "/main/events" },
         { name: t("search"),      icon: Search,      href: "/main/search" },
@@ -132,6 +153,7 @@ export function ChannelSidebar() {
     {
       name: "COMMUNITY",
       channels: [
+        { name: "Communities",    icon: Globe,       href: "/main/communities" },
         { name: t("market"),      icon: ShoppingBag, href: "/main/marketplace" },
         { name: t("lostFound"),   icon: Search,      href: "/main/lost-found" },
         { name: t("support"),     icon: LifeBuoy,    href: "/main/support" },
@@ -170,11 +192,6 @@ export function ChannelSidebar() {
                   >
                     <Icon className={cn("w-3.5 h-3.5 shrink-0", isActive ? "text-primary" : "opacity-50 group-hover:opacity-80")} />
                     <span className="truncate flex-1 text-[13px]">{ch.name}</span>
-                    {ch.badge && (
-                      <span className="w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center shrink-0">
-                        {ch.badge}
-                      </span>
-                    )}
                   </Link>
                 );
               })}

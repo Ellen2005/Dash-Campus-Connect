@@ -36,6 +36,12 @@ export async function GET(request: NextRequest) {
 
     let where: any = { approvalStatus: 'APPROVED' }
 
+    // Allow fetching pending events for admin review
+    const approvalStatusParam = searchParams.get('approvalStatus');
+    if (approvalStatusParam && ['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatusParam)) {
+      where.approvalStatus = approvalStatusParam;
+    }
+
     // Date filtering
     const now = new Date()
     if (category === 'upcoming') {

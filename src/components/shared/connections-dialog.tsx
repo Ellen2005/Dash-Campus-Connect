@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,29 +8,47 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, UserCheck, UserPlus, MessageCircle, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
-const mockConnections = [
-  { id: "1", name: "Sarah Chen",      username: "schen_bio",    avatar: "https://picsum.photos/seed/sarah/80/80",  mutual: 12, status: "connected" as const },
-  { id: "2", name: "Mike Johnson",    username: "mjohnson_cs",  avatar: "https://picsum.photos/seed/mike/80/80",   mutual: 5,  status: "connected" as const },
-  { id: "3", name: "Priya Sharma",    username: "priya_med",    avatar: "https://picsum.photos/seed/priya/80/80",  mutual: 8,  status: "pending" as const },
-  { id: "4", name: "Jordan Lee",      username: "jlee_arts",    avatar: "https://picsum.photos/seed/jordan/80/80", mutual: 3,  status: "none" as const },
-  { id: "5", name: "Dr. Sarah Miller",username: "sarahm",       avatar: "https://picsum.photos/seed/miller/80/80", mutual: 20, status: "none" as const },
-  { id: "6", name: "Kwame Asante",    username: "kwame_eng",    avatar: "https://picsum.photos/seed/kwame/80/80",  mutual: 7,  status: "none" as const },
-];
+// Connections are loaded from the server via `/api/search`.
 
 interface ConnectionsDialogProps { open: boolean; onClose: () => void; }
 
 export function ConnectionsDialog({ open, onClose }: ConnectionsDialogProps) {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
-  const [statuses, setStatuses] = useState<Record<string, "connected" | "pending" | "none">>(
-    Object.fromEntries(mockConnections.map(c => [c.id, c.status]))
-  );
+  const [statuses, setStatuses] = useState<Record<string, "connected" | "pending" | "none">>({});
+  const [connections, setConnections] = useState<any[]>([]);
 
-  const filtered = mockConnections.filter(c =>
+  useEffect(() => {
+    if (!open) return;
+    let mounted = true;
+    const run = async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&currentUserId=${encodeURIComponent(user?.id ?? "")}`, { cache: "no-store" });
+        const json = await res.json().catch(() => ({} as any));
+        const users = Array.isArray(json?.users) ? json.users : [];
+        if (!mounted) return;
+        const normalized = users.map((u: any) => ({ id: u.id, name: u.name ?? u.fullName ?? u.username, username: u.username, avatar: u.profilePhoto ?? "", mutual: u.mutual ?? 0 }));
+        setConnections(normalized);
+        setStatuses(prev => {
+          const next: Record<string, "connected" | "pending" | "none"> = { ...prev };
+          normalized.forEach((u: any) => { if (!next[u.id]) next[u.id] = "none"; });
+          return next;
+        });
+      } catch {
+        // ignore
+      }
+    };
+    run();
+    return () => { mounted = false; };
+  }, [open, query, user?.id]);
+
+  const filtered = connections.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||
-    c.username.toLowerCase().includes(query.toLowerCase())
+    (c.username ?? "").toLowerCase().includes(query.toLowerCase())
   );
 
   const connected = filtered.filter(c => statuses[c.id] === "connected");
@@ -91,7 +109,7 @@ export function ConnectionsDialog({ open, onClose }: ConnectionsDialogProps) {
 }
 
 function PersonRow({ person, status, onToggle, t, showMessage }: {
-  person: typeof mockConnections[0];
+  person: { id: string; name: string; username: string; avatar: string; mutual: number };
   status: "connected" | "pending" | "none";
   onToggle: (id: string) => void;
   t: (k: any) => string;

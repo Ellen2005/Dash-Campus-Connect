@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
               OR: [
                 { name: { contains: q, mode: "insensitive" } },
                 { username: { contains: q, mode: "insensitive" } },
-                { major: { contains: q, mode: "insensitive" } },
+                { fieldOfStudy: { name: { contains: q, mode: "insensitive" } } },
               ],
             }
           : {}),

@@ -28,11 +28,12 @@ export async function GET(request: NextRequest) {
         bio: true,
         profilePhoto: true,
         coverPhoto: true,
-        major: true,
-        year: true,
         interests: true,
         hometown: true,
         role: true,
+        createdAt: true,
+        fieldOfStudy: { select: { name: true } },
+        level: { select: { name: true } },
       },
     });
 
@@ -61,13 +62,15 @@ export async function GET(request: NextRequest) {
           bio: user.bio ?? "",
           profilePhoto: user.profilePhoto ?? "",
           coverPhoto: user.coverPhoto ?? "",
-          major: user.major ?? "",
-          year: user.year ?? "",
+          fieldOfStudy: user.fieldOfStudy?.name ?? "",
+          level: user.level?.name ?? "",
           hometown: user.hometown ?? "",
           interests: user.interests ?? [],
           followersCount,
           followingCount,
           isFollowing: !!isFollowing,
+          role: user.role,
+          createdAt: user.createdAt,
         },
       },
       { status: 200 }
@@ -77,4 +80,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: `Failed to lookup user. ${msg}`.trim() }, { status: 500 });
   }
 }
-

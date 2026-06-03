@@ -80,7 +80,7 @@ export default function NotificationsPage() {
             n.type === "FRIEND_REQUEST" ? "follow" :
             n.type === "MENTION" ? "mention" :
             "announcement",
-          read: n.isRead,
+          read: n.read ?? n.isRead ?? false,
           time: new Date(n.createdAt).toLocaleString(),
           text: n.title,
           sub: n.message,
@@ -94,8 +94,28 @@ export default function NotificationsPage() {
     run();
   }, [user?.id]);
 
-  const markAllRead = () => setNotifs(n => n.map(x => ({ ...x, read: true })));
-  const markRead = (id: string) => setNotifs(n => n.map(x => x.id === id ? { ...x, read: true } : x));
+  const markAllRead = async () => {
+    setNotifs(n => n.map(x => ({ ...x, read: true })));
+    if (user?.id) {
+      await fetch("/api/notifications", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      }).catch(() => null);
+    }
+  };
+
+  const markRead = async (id: string) => {
+    setNotifs(n => n.map(x => x.id === id ? { ...x, read: true } : x));
+    if (user?.id) {
+      await fetch("/api/notifications", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId: user.id, notificationId: id }),
+      }).catch(() => null);
+    }
+  };
+
   const deleteNotif = (id: string) => setNotifs(n => n.filter(x => x.id !== id));
 
   const filteredByPrefs = (list: Notif[]) => list.filter(n => {

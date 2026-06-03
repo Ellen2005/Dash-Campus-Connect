@@ -8,8 +8,8 @@ const UpdateUserSchema = z.object({
   bio: z.string().optional(),
   profilePhoto: z.string().optional(),
   coverPhoto: z.string().optional(),
-  major: z.string().optional(),
-  year: z.string().optional(),
+  fieldOfStudyId: z.string().optional(),
+  levelId: z.string().optional(),
   interests: z.array(z.string()).optional(),
   phone: z.string().optional(),
   secondaryEmail: z.string().email().optional(),
@@ -25,13 +25,25 @@ export async function GET(
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        posts: {
-          take: 10,
-          orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        bio: true,
+        profilePhoto: true,
+        coverPhoto: true,
+        hometown: true,
+        createdAt: true,
+        fieldOfStudy: { select: { id: true, name: true } },
+        level: { select: { id: true, name: true } },
+        interests: true,
+        _count: {
+          select: {
+            followers: true,
+            following: true,
+            posts: true,
+          },
         },
-        followers: true,
-        following: true,
       },
     })
 
@@ -39,10 +51,7 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Don't return password
-    const { password, ...userWithoutPassword } = user
-
-    return NextResponse.json(userWithoutPassword)
+    return NextResponse.json(user)
   } catch (error) {
     console.error('Error fetching user:', error)
     return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })
@@ -61,12 +70,22 @@ export async function PATCH(
     const user = await prisma.user.update({
       where: { id: userId },
       data: updateData,
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        bio: true,
+        profilePhoto: true,
+        coverPhoto: true,
+        hometown: true,
+        createdAt: true,
+        fieldOfStudy: { select: { id: true, name: true } },
+        level: { select: { id: true, name: true } },
+        interests: true,
+      },
     })
 
-    // Don't return password
-    const { password, ...userWithoutPassword } = user
-
-    return NextResponse.json(userWithoutPassword)
+    return NextResponse.json(user)
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 })

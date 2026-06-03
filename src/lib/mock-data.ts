@@ -6,4 +6,3 @@ export function mergeWithMock<T>(realData: T[], mockData: T[]): T[] {
   if (!isMockDataEnabled()) return realData;
   return [...realData, ...mockData];
 }
-

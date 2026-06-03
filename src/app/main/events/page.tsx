@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ type EventItem = {
   maxAttendees?: number;
   rsvpStatus?: "Going" | "Maybe" | "Not Going" | null;
   organizerId?: string;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
 };
 
 const HOST_GUIDELINES = [
@@ -42,46 +43,71 @@ export default function EventsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { dashUser } = useAuth();
+  const loadedRef = useRef(false);
+  const userIdRef = useRef(dashUser?.id);
 
-  const loadEvents = async () => {
-    const params = new URLSearchParams();
-    params.set("limit", "100");
-    if (searchQuery.trim()) params.set("search", searchQuery.trim());
-    const res = await fetch(`/api/events?${params.toString()}`, { cache: "no-store" });
-    const json = await res.json().catch(() => ({} as any));
-    if (!res.ok) return;
-    const next = Array.isArray(json?.events)
-      ? json.events.map((event: any) => ({
-          id: event.id,
-          title: event.title,
-          bannerImageUrl: event.bannerImageUrl || "https://picsum.photos/seed/event-default/800/450",
-          startDate: event.date,
-          locationName: event.location,
-          category: selectedCategory,
-          organiserName: event.organizer?.name ?? "Organizer",
-          organiserAvatar: event.organizer?.profilePhoto ?? "",
-          attendeeCount: event._count?.attendees ?? 0,
-          maxAttendees: event.capacity ?? undefined,
-          organizerId: event.organizer?.id,
-        }))
-      : [];
-    setEvents(next);
-  };
+  // Track userId changes separately to avoid re-fetch loops
+  if (dashUser?.id !== userIdRef.current) {
+    userIdRef.current = dashUser?.id;
+  }
 
+  const selectedCategoryRef = useRef(selectedCategory);
+  selectedCategoryRef.current = selectedCategory;
+
+  const loadEvents = useCallback(async (search?: string) => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "100");
+      if (search?.trim()) params.set("search", search.trim());
+      const res = await fetch(`/api/events?${params.toString()}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const json = await res.json().catch(() => ({} as any));
+      const next = Array.isArray(json?.events)
+        ? json.events.map((event: any) => ({
+            id: event.id,
+            title: event.title,
+            bannerImageUrl: event.bannerImageUrl || "https://picsum.photos/seed/event-default/800/450",
+            startDate: event.date,
+            locationName: event.location,
+            category: selectedCategoryRef.current,
+            organiserName: event.organizer?.name ?? "Organizer",
+            organiserAvatar: event.organizer?.profilePhoto ?? "",
+            attendeeCount: event._count?.attendees ?? 0,
+            maxAttendees: event.capacity ?? undefined,
+            organizerId: event.organizer?.id,
+            approvalStatus: event.approvalStatus ?? "APPROVED",
+          }))
+        : [];
+      setEvents(next);
+    } finally {
+      setIsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Initial load only — never re-run on dependency changes that cause modal shake
   useEffect(() => {
-    void loadEvents();
-  }, [searchQuery, dashUser?.id, selectedCategory]);
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      void loadEvents();
+    }
+  }, [loadEvents]);
 
-  const filteredEvents = events.filter(e => {
-    const matchesCategory = selectedCategory === "All" || e.category === selectedCategory;
-    const matchesSearch = !searchQuery ||
-      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.organiserName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const handleCreated = useCallback(() => {
+    void loadEvents(searchQuery);
+  }, [loadEvents, searchQuery]);
+
+  const filteredEvents = searchQuery
+    ? events.filter(e =>
+        e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.locationName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.organiserName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : events;
 
   const now = new Date();
   const upcoming = filteredEvents.filter((e) => new Date(e.startDate) >= now);
@@ -100,7 +126,7 @@ export default function EventsPage() {
           <h1 className="text-2xl font-headline font-extrabold tracking-tight">Campus Events</h1>
           <p className="text-sm text-muted-foreground">Connect, learn, and celebrate with your community.</p>
         </div>
-        <CreateEventDialog onCreated={loadEvents} />
+        <CreateEventDialog onCreated={handleCreated} />
       </div>
 
       <div className="space-y-4">

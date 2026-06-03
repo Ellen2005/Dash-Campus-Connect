@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
         school_id:  schoolId,
         faculty:    faculty ?? "",
         year:       year ?? "",
+        field_of_study_id: fieldOfStudyId ?? "",
+        level_id:       levelId ?? "",
         role:       "student",
         status:     "pending",
       },

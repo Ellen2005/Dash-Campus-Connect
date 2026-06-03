@@ -22,6 +22,8 @@ interface EventCardProps {
   attendeeCount: number;
   maxAttendees?: number;
   rsvpStatus?: "Going" | "Maybe" | "Not Going" | null;
+  organizerId?: string;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
 }
 
 export function EventCard({

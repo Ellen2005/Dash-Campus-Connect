@@ -8,7 +8,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============= User & Authentication =============
@@ -70,6 +69,14 @@ model User {
   shoppingCart          ShoppingCart?
   supportTickets        SupportTicket[]
   adminChatMessages     AdminChatMessage[]
+  communityPosts        CommunityPost[]
+  ticketMessages        TicketMessage[]
+  stories               Story[]
+  lostFoundItems        LostFoundItem[]
+  cgCreatedGroups       CommunityGroup[]        @relation("cgCreator")
+  cgMemberships         CommunityGroupMember[]  @relation("cgMember")
+  cgMessages            CommunityGroupMessage[] @relation("cgSender")
+  cgUploadedFiles       CommunityGroupFile[]    @relation("cgUploader")
 
   @@index([email])
   @@index([username])
@@ -84,6 +91,7 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   REJECTED
+  SUSPENDED
 }
 
 enum Role {
@@ -108,6 +116,7 @@ model School {
   fieldsOfStudy   FieldOfStudy[]
   levels          Level[]
   communities     Community[]
+  adminChatGroups AdminChatGroup[]
 
   @@index([createdAt])
 }
@@ -203,6 +212,7 @@ model Community {
   
   members             CommunityMember[]
   posts               CommunityPost[]
+  groups              CommunityGroup[]
   
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
@@ -246,11 +256,90 @@ model CommunityPost {
   community       Community       @relation(fields: [communityId], references: [id], onDelete: Cascade)
   communityId     String
   
+  author          User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId        String
+  
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
   @@index([communityId])
   @@index([createdAt])
+  @@index([authorId])
+}
+
+// ============= Community Internal Groups =============
+model CommunityGroup {
+  id              String              @id @default(cuid())
+  name            String
+  description     String?             @db.Text
+  photo           String?
+  isPrivate       Boolean             @default(false)
+
+  community       Community           @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  communityId     String
+
+  creator         User                @relation("cgCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId       String
+
+  members         CommunityGroupMember[]
+  messages        CommunityGroupMessage[]
+  files           CommunityGroupFile[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([communityId])
+  @@index([creatorId])
+}
+
+model CommunityGroupMember {
+  id              String              @id @default(cuid())
+  group           CommunityGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId         String
+  user            User                @relation("cgMember", fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  role            CommunityGroupRole  @default(MEMBER)
+  joinedAt        DateTime            @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+enum CommunityGroupRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+model CommunityGroupMessage {
+  id              String              @id @default(cuid())
+  content         String              @db.Text
+  group           CommunityGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId         String
+  sender          User                @relation("cgSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId        String
+  attachments     String[]            @default([])
+  createdAt       DateTime            @default(now())
+
+  @@index([groupId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model CommunityGroupFile {
+  id              String              @id @default(cuid())
+  name            String
+  url             String
+  mimeType        String?
+  size            Int?
+  group           CommunityGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId         String
+  uploader        User                @relation("cgUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+  uploaderId      String
+  createdAt       DateTime            @default(now())
+
+  @@index([groupId])
 }
 
 // ============= Marketplace - Brands & Orders =============
@@ -370,12 +459,16 @@ model TicketMessage {
   ticket          SupportTicket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId        String
   
+  sender          User?               @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  senderId        String?
+  
   content         String              @db.Text
   attachments     String[]            @default([])
   
   createdAt       DateTime            @default(now())
 
   @@index([ticketId])
+  @@index([senderId])
 }
 
 enum TicketCategory {
@@ -436,10 +529,14 @@ enum AnnouncementPriority {
 model AdminChatGroup {
   id              String              @id @default(cuid())
   name            String              @default("Admin Channel")
+  schoolId        String?
+  school          School?             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   messages        AdminChatMessage[]
   
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+
+  @@index([schoolId])
 }
 
 model AdminChatMessage {
@@ -455,6 +552,9 @@ model AdminChatMessage {
   
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  
+  senderName      String?
+  senderRole      String?
 
   @@index([chatGroupId])
   @@index([senderId])
@@ -888,4 +988,58 @@ model ActivityLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// ============= Stories =============
+model Story {
+  id          String   @id @default(cuid())
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId    String
+  mediaUrl    String
+  mediaType   String   @default("image") // "image" or "video"
+  caption     String?
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([authorId])
+  @@index([expiresAt])
+}
+
+// ============= Lost & Found =============
+model LostFoundItem {
+  id          String              @id @default(cuid())
+  title       String
+  description String              @db.Text
+  category    LostFoundCategory
+  status      LostFoundStatus     @default(LOST)
+  location    String?
+  dateLost    DateTime?
+  dateFound   DateTime?
+  images      String[]            @default([])
+  contactInfo String?
+  
+  reporter    User                @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reporterId  String
+  
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([reporterId])
+  @@index([status])
+  @@index([category])
+}
+
+enum LostFoundCategory {
+  ELECTRONICS
+  CLOTHING
+  ACCESSORIES
+  DOCUMENTS
+  KEYS
+  OTHER
+}
+
+enum LostFoundStatus {
+  LOST
+  FOUND
+  CLAIMED
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,48 +10,86 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Ticket, Clock, ShieldCheck, Loader2, ChevronRight, AlertTriangle, HelpCircle, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
-const mockTickets = [
-  { id: "TKT-001", subject: "Can't access my course materials", category: "Tech Support", status: "resolved", updated: "1 day ago" },
-  { id: "TKT-002", subject: "Reported scam post in marketplace",  category: "Moderation",   status: "in-review", updated: "3 hours ago" },
-  { id: "TKT-003", subject: "Username change request",            category: "Account",      status: "open",      updated: "1 hour ago" },
-];
-
-const statusColors = {
-  open:       "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  "in-review":"bg-amber-500/10 text-amber-400 border-amber-500/20",
-  resolved:   "bg-primary/10 text-primary border-primary/20",
+type MyTicket = {
+  id: string; title: string; category: string; status: string; createdAt: string;
 };
 
-const statusLabels: Record<string, string> = {
-  open: "Open", "in-review": "In Review", resolved: "Resolved",
+const statusColors: Record<string, string> = {
+  OPEN: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  IN_PROGRESS: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  ON_HOLD: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  RESOLVED: "bg-primary/10 text-primary border-primary/20",
+  CLOSED: "bg-muted text-muted-foreground border-border",
+};
+
+const categoryMap: Record<string, string> = {
+  "tech-support": "TECHNICAL", "report-behavior": "BEHAVIORAL",
+  "account": "INQUIRY", "marketplace": "INQUIRY", "general-inquiry": "INQUIRY",
 };
 
 export default function SupportPage() {
   const { toast } = useToast();
   const { t } = useI18n();
+  const { dashUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-  const [ticketRef] = useState(() => Math.floor(Math.random() * 900) + 100);
+  const [myTickets, setMyTickets] = useState<MyTicket[]>([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [lastTicketId, setLastTicketId] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadTickets = async () => {
+    if (!dashUser?.id) return;
+    setTicketsLoading(true);
+    try {
+      const res = await fetch(`/api/support?userId=${dashUser.id}`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(json?.tickets)) setMyTickets(json.tickets);
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadTickets(); }, [dashUser?.id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!dashUser?.id) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const res = await fetch("/api/support", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          userId: dashUser.id,
+          title: subject.trim(),
+          description: description.trim(),
+          category: categoryMap[category] ?? "INQUIRY",
+          priority: "NORMAL",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to submit ticket.");
+      setLastTicketId(json.ticket?.id?.slice(-6) ?? "???");
       setSubmitted(true);
       toast({ title: t("ticketSubmitted"), description: t("ticketFollowUp") });
-    }, 1400);
+      await loadTickets();
+    } catch (err: any) {
+      toast({ title: "Submission failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const quickCategories = [
-    { icon: HelpCircle,    labelKey: "techSupport" as const,    descKey: "techSupportDesc" as const,    val: "tech-support",     color: "text-primary" },
-    { icon: AlertTriangle, labelKey: "reportBehavior" as const, descKey: "reportBehaviorDesc" as const, val: "report-behavior",  color: "text-destructive" },
-    { icon: MessageSquare, labelKey: "generalInquiry" as const, descKey: "generalInquiryDesc" as const, val: "general-inquiry",  color: "text-primary" },
+    { icon: HelpCircle, labelKey: "techSupport" as const, descKey: "techSupportDesc" as const, val: "tech-support", color: "text-primary" },
+    { icon: AlertTriangle, labelKey: "reportBehavior" as const, descKey: "reportBehaviorDesc" as const, val: "report-behavior", color: "text-destructive" },
+    { icon: MessageSquare, labelKey: "generalInquiry" as const, descKey: "generalInquiryDesc" as const, val: "general-inquiry", color: "text-primary" },
   ];
 
   return (
@@ -96,13 +134,13 @@ export default function SupportPage() {
 
           {submitted ? (
             <div className="flex flex-col items-center gap-4 py-6 text-center animate-in fade-in zoom-in-95 duration-200">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center animate-bounce-in">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
                 <CheckCircle2 className="w-7 h-7 text-primary" />
               </div>
               <div className="space-y-1">
                 <h3 className="font-semibold">{t("ticketReceived")}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Reference: <span className="font-mono text-primary">TKT-{ticketRef}</span>
+                  Reference: <span className="font-mono text-primary">#{lastTicketId}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-muted/30 px-4 py-2 rounded-full border border-border">
@@ -139,7 +177,7 @@ export default function SupportPage() {
                   placeholder={t("describeIssue")} className="min-h-[100px] bg-muted/30 border-border resize-none text-sm" maxLength={2000} required />
                 <p className="text-[10px] text-muted-foreground text-right">{description.length}/2000</p>
               </div>
-              <Button type="submit" className="w-full dash-button-primary h-9" disabled={isSubmitting || !category || !subject.trim()}>
+              <Button type="submit" className="w-full dash-button-primary h-9" disabled={isSubmitting || !category || !subject.trim() || !dashUser}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Ticket className="w-4 h-4 mr-2" />}
                 {t("submit")}
               </Button>
@@ -151,34 +189,41 @@ export default function SupportPage() {
         <div className="dash-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-base">{t("myTickets")}</h2>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{mockTickets.length} total</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{myTickets.length} total</span>
           </div>
-          <div className="space-y-2.5">
-            {mockTickets.map((ticket, i) => (
-              <div
-                key={ticket.id}
-                className="p-3.5 rounded-xl bg-muted/20 border border-border hover:border-primary/20 transition-all duration-150 cursor-pointer group animate-in fade-in duration-200"
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{ticket.subject}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-mono text-muted-foreground">{ticket.id}</span>
-                      <span className="text-[10px] text-muted-foreground">·</span>
-                      <span className="text-[10px] text-muted-foreground">{ticket.category}</span>
+          {ticketsLoading ? (
+            <div className="flex items-center justify-center py-6 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading…
+            </div>
+          ) : myTickets.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Ticket className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">No tickets yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {myTickets.map((ticket, i) => (
+                <div key={ticket.id} className="p-3.5 rounded-xl bg-muted/20 border border-border hover:border-primary/20 transition-all duration-150 cursor-pointer group animate-in fade-in duration-200" style={{ animationDelay: `${i * 50}ms` }}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">{ticket.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-mono text-muted-foreground">#{ticket.id.slice(-6)}</span>
+                        <span className="text-[10px] text-muted-foreground">·</span>
+                        <span className="text-[10px] text-muted-foreground">{ticket.category}</span>
+                      </div>
                     </div>
+                    <Badge className={cn("text-[9px] font-bold border shrink-0", statusColors[ticket.status] ?? "bg-muted text-muted-foreground border-border")}>
+                      {ticket.status.replace("_", " ")}
+                    </Badge>
                   </div>
-                  <Badge className={cn("text-[9px] font-bold border shrink-0", statusColors[ticket.status as keyof typeof statusColors])}>
-                    {statusLabels[ticket.status]}
-                  </Badge>
+                  <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
+                    <Clock className="w-3 h-3" /> {t("updatedAt")} {new Date(ticket.createdAt).toLocaleString()}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-                  <Clock className="w-3 h-3" /> {t("updatedAt")} {ticket.updated}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
           <div className="pt-2 border-t border-border flex items-center gap-2 text-[10px] text-muted-foreground">
             <ShieldCheck className="w-3 h-3 text-primary" />
             {t("reportsPrivate")}

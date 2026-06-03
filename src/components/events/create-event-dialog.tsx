@@ -104,7 +104,7 @@ export function CreateEventDialog({ onCreated }: { onCreated?: () => Promise<voi
           Create Event
         </Button>
       </DialogTrigger>
-      <DialogContent className="obsidian-card max-w-2xl overflow-y-auto max-h-[90vh]">
+      <DialogContent className="obsidian-card max-w-2xl overflow-y-auto max-h-[90vh] overscroll-contain">
         <DialogHeader>
           <DialogTitle className="text-xl font-headline font-bold">New Campus Event</DialogTitle>
           <DialogDescription>

@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
           OR: [
             { name: { contains: query, mode: "insensitive" as const } },
             { username: { contains: query, mode: "insensitive" as const } },
-            { major: { contains: query, mode: "insensitive" as const } },
+            { fieldOfStudy: { name: { contains: query, mode: "insensitive" as const } } },
           ],
           ...(scopeGroupId ? { groupMemberships: { some: { groupId: scopeGroupId } } } : {}),
         }
@@ -63,6 +63,8 @@ export async function GET(request: NextRequest) {
           following: {
             select: { followerId: true, followingId: true },
           },
+          fieldOfStudy: { select: { name: true } },
+          level: { select: { name: true } },
         },
       }),
       prisma.group.findMany({
@@ -86,12 +88,17 @@ export async function GET(request: NextRequest) {
         ? user.followers.some((follow) => follow.followerId === currentUserId)
         : false;
 
+      const facultyParts = [
+        user.fieldOfStudy?.name,
+        user.level?.name,
+      ].filter(Boolean);
+
       return {
         id: user.id,
         name: user.name,
         username: user.username,
         avatar: user.profilePhoto,
-        faculty: [user.major, user.year].filter(Boolean).join(" '"),
+        faculty: facultyParts.join(" · "),
         mutual: Math.min(user.followers.length, user.following.length),
         status: isCurrentUser ? "connected" : following ? "connected" : "none",
       };

@@ -37,7 +37,10 @@ import {
   Car,
   Shirt,
   Sparkles,
-  Loader2
+  Loader2,
+  Store,
+  ShoppingCart,
+  Tag
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -67,6 +70,16 @@ interface Listing {
   saved?: boolean;
 }
 
+interface Brand {
+  id: string;
+  name: string;
+  description: string | null;
+  logo: string | null;
+  sellerId: string;
+  createdAt: string;
+  _count: { listings: number };
+}
+
 export default function MarketplacePage() {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -87,6 +100,13 @@ export default function MarketplacePage() {
     description: "",
     photos: [] as File[],
   });
+
+  // Brands state
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [isBrandDialogOpen, setIsBrandDialogOpen] = useState(false);
+  const [isCreatingBrand, setIsCreatingBrand] = useState(false);
+  const [brandForm, setBrandForm] = useState({ name: "", description: "", logo: "" });
 
   const toggleSave = (id: string) => {
     setSavedItems(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
@@ -136,9 +156,52 @@ export default function MarketplacePage() {
     }
   };
 
+  const loadBrands = async () => {
+    if (!dashUser?.id) return;
+    setBrandsLoading(true);
+    try {
+      const res = await fetch(`/api/brands?sellerId=${dashUser.id}`, { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(json?.brands)) setBrands(json.brands);
+    } catch {
+      // ignore
+    } finally {
+      setBrandsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadListings();
-  }, [searchQuery, selectedCategory]);
+    void loadBrands();
+  }, [searchQuery, selectedCategory, dashUser?.id]);
+
+  const handleCreateBrand = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!dashUser?.id) return;
+    setIsCreatingBrand(true);
+    try {
+      const res = await fetch("/api/brands", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: brandForm.name.trim(),
+          description: brandForm.description.trim() || undefined,
+          logo: brandForm.logo.trim() || undefined,
+          sellerId: dashUser.id,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to create brand.");
+      setIsBrandDialogOpen(false);
+      setBrandForm({ name: "", description: "", logo: "" });
+      toast({ title: "Brand created!", description: "Your brand is now visible on the marketplace." });
+      await loadBrands();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsCreatingBrand(false);
+    }
+  };
 
   const handleMessage = async (listing: Listing) => {
     if (!dashUser) return;
@@ -232,113 +295,124 @@ export default function MarketplacePage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-headline font-bold">{t("campusMarketplace")}</h1>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="dash-button-primary gap-2">
-                <Plus className="w-4 h-4" />
-                {t("sellItem")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-headline font-bold">{t("listYourItem")}</DialogTitle>
-                <DialogDescription>
-                  {t("postItemSale")}
-                </DialogDescription>
-              </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => router.push("/main/marketplace/checkout")}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              Cart
+            </Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="dash-button-primary gap-2">
+                  <Plus className="w-4 h-4" />
+                  {t("sellItem")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-headline font-bold">{t("listYourItem")}</DialogTitle>
+                  <DialogDescription>
+                    {t("postItemSale")}
+                  </DialogDescription>
+                </DialogHeader>
 
-              <form onSubmit={handleCreateListing} className="space-y-6 pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("itemTitle")}</Label>
-                      <Input value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} placeholder="e.g. Calculus Textbook" className="bg-background/50 border-border" required />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleCreateListing} className="space-y-6 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("priceLabel")}</Label>
-                        <div className="relative">
-                          <Input type="number" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} placeholder="0" className="bg-background/50 border-border pl-16" />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-primary">FCFA</span>
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("itemTitle")}</Label>
+                        <Input value={form.title} onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))} placeholder="e.g. Calculus Textbook" className="bg-background/50 border-border" required />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("priceLabel")}</Label>
+                          <div className="relative">
+                            <Input type="number" value={form.price} onChange={(e) => setForm((current) => ({ ...current, price: e.target.value }))} placeholder="0" className="bg-background/50 border-border pl-16" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-primary">FCFA</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Category</Label>
+                          <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value }))}>
+                            <SelectTrigger className="bg-background/50 border-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="TEXTBOOKS">Textbooks</SelectItem>
+                              <SelectItem value="ELECTRONICS">Electronics</SelectItem>
+                              <SelectItem value="HOUSING">Housing</SelectItem>
+                              <SelectItem value="SERVICES">Services</SelectItem>
+                              <SelectItem value="OTHER">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
+
                       <div className="space-y-2">
-                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Category</Label>
-                        <Select value={form.category} onValueChange={(value) => setForm((current) => ({ ...current, category: value }))}>
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Condition</Label>
+                        <Select value={form.condition} onValueChange={(value) => setForm((current) => ({ ...current, condition: value }))}>
                           <SelectTrigger className="bg-background/50 border-border">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="TEXTBOOKS">Textbooks</SelectItem>
-                            <SelectItem value="ELECTRONICS">Electronics</SelectItem>
-                            <SelectItem value="HOUSING">Housing</SelectItem>
-                            <SelectItem value="SERVICES">Services</SelectItem>
-                            <SelectItem value="OTHER">Other</SelectItem>
+                            <SelectItem value="NEW">New</SelectItem>
+                            <SelectItem value="LIKE_NEW">Like New</SelectItem>
+                            <SelectItem value="GOOD">Good</SelectItem>
+                            <SelectItem value="FAIR">Fair</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Condition</Label>
-                      <Select value={form.condition} onValueChange={(value) => setForm((current) => ({ ...current, condition: value }))}>
-                        <SelectTrigger className="bg-background/50 border-border">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="NEW">New</SelectItem>
-                          <SelectItem value="LIKE_NEW">Like New</SelectItem>
-                          <SelectItem value="GOOD">Good</SelectItem>
-                          <SelectItem value="FAIR">Fair</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("descriptionLabel")}</Label>
-                      <Textarea
-                        value={form.description}
-                        onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
-                        placeholder="Describe your item in detail..."
-                        className="min-h-[100px] bg-background/50 border-border resize-none"
-                        maxLength={1000}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("photosLabel")}</Label>
-                      <label className="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center gap-2 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
-                        <Package className="w-8 h-8 text-muted-foreground" />
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{form.photos.length > 0 ? `${form.photos.length} selected` : t("uploadPhotos")}</span>
-                        <span className="text-[9px] text-muted-foreground">Max 5 • JPG, PNG</span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => setForm((current) => ({ ...current, photos: Array.from(e.target.files ?? []).slice(0, 5) }))}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("descriptionLabel")}</Label>
+                        <Textarea
+                          value={form.description}
+                          onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
+                          placeholder="Describe your item in detail..."
+                          className="min-h-[100px] bg-background/50 border-border resize-none"
+                          maxLength={1000}
+                          required
                         />
-                      </label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">{t("photosLabel")}</Label>
+                        <label className="border-2 border-dashed border-border rounded-xl aspect-[4/3] flex flex-col items-center justify-center gap-2 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
+                          <Package className="w-8 h-8 text-muted-foreground" />
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{form.photos.length > 0 ? `${form.photos.length} selected` : t("uploadPhotos")}</span>
+                          <span className="text-[9px] text-muted-foreground">Max 5 • JPG, PNG</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => setForm((current) => ({ ...current, photos: Array.from(e.target.files ?? []).slice(0, 5) }))}
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <DialogFooter className="border-t border-border pt-6 mt-4">
-                  <Button variant="ghost" type="button" onClick={() => setIsCreateDialogOpen(false)} disabled={isCreating}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="dash-button-primary px-8" disabled={isCreating}>
-                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                    {t("listItem")}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <DialogFooter className="border-t border-border pt-6 mt-4">
+                    <Button variant="ghost" type="button" onClick={() => setIsCreateDialogOpen(false)} disabled={isCreating}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="dash-button-primary px-8" disabled={isCreating}>
+                      {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                      {t("listItem")}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Search and Filters */}
@@ -369,6 +443,77 @@ export default function MarketplacePage() {
           </Select>
         </div>
       </div>
+
+      {/* Brands Section */}
+      {dashUser && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold flex items-center gap-2">
+              <Store className="w-4 h-4 text-primary" />
+              Your Brands
+            </h2>
+            <Dialog open={isBrandDialogOpen} onOpenChange={setIsBrandDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1">
+                  <Plus className="w-3.5 h-3.5" /> Create Brand
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm">
+                <DialogHeader>
+                  <DialogTitle className="text-base font-semibold">Create Brand</DialogTitle>
+                  <DialogDescription>Register your brand for the campus marketplace.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateBrand} className="space-y-3 pt-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Brand Name</Label>
+                    <Input value={brandForm.name} onChange={e => setBrandForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Campus Threads" className="h-9 text-sm bg-muted/30" required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Description (optional)</Label>
+                    <Textarea value={brandForm.description} onChange={e => setBrandForm(f => ({ ...f, description: e.target.value }))} placeholder="Tell buyers about your brand" className="min-h-[70px] text-sm bg-muted/30 resize-none" maxLength={500} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Logo URL (optional)</Label>
+                    <Input value={brandForm.logo} onChange={e => setBrandForm(f => ({ ...f, logo: e.target.value }))} placeholder="https://example.com/logo.png" className="h-9 text-sm bg-muted/30" />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setIsBrandDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit" size="sm" className="dash-button-primary" disabled={isCreatingBrand || !brandForm.name.trim()}>
+                      {isCreatingBrand ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Create"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {brandsLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading brands...
+            </div>
+          ) : brands.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {brands.map((brand) => (
+                <Card key={brand.id} className="dash-card-hover p-3 flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/main/marketplace?brand=${brand.id}`)}>
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 overflow-hidden">
+                    {brand.logo ? (
+                      <img src={brand.logo} alt={brand.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Store className="w-5 h-5 text-primary" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate">{brand.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{brand._count.listings} listings</p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground py-1">No brands yet. Create one to organize your listings.</p>
+          )}
+        </div>
+      )}
 
       {/* Listings Grid */}
       {loading ? (

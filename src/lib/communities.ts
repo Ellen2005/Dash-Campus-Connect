@@ -64,10 +64,11 @@ export async function createAutoCommunitiesForLevel(
   const fields = await prisma.fieldOfStudy.findMany({ where: { schoolId } });
 
   // Create level-only community
+  const displayName = levelName.toLowerCase().startsWith('level') ? levelName : `Level ${levelName}`;
   await prisma.community.create({
     data: {
-      name: `Level ${levelName}`,
-      description: `Community for all students in Level ${levelName}`,
+      name: displayName,
+      description: `Community for all students in ${displayName}`,
       type: 'LEVEL_ONLY',
       schoolId,
       levelId,
@@ -108,61 +109,56 @@ export async function assignStudentToCommunities(userId: string) {
     throw new Error('User must have school, field, and level assigned');
   }
 
-  // Find the 3 communities
-  const fieldCommunity = await prisma.community.findFirst({
-    where: {
-      schoolId: user.schoolId,
-      fieldOfStudyId: user.fieldOfStudyId,
-      levelId: null,
-      type: 'FIELD_ONLY',
-    },
-  });
+  const [fieldCommunity, levelCommunity, fieldLevelCommunity] = await Promise.all([
+    prisma.community.findFirst({
+      where: {
+        schoolId: user.schoolId,
+        fieldOfStudyId: user.fieldOfStudyId,
+        levelId: null,
+        type: 'FIELD_ONLY',
+      },
+    }),
+    prisma.community.findFirst({
+      where: {
+        schoolId: user.schoolId,
+        fieldOfStudyId: null,
+        levelId: user.levelId,
+        type: 'LEVEL_ONLY',
+      },
+    }),
+    prisma.community.findFirst({
+      where: {
+        schoolId: user.schoolId,
+        fieldOfStudyId: user.fieldOfStudyId,
+        levelId: user.levelId,
+        type: 'FIELD_AND_LEVEL',
+      },
+    }),
+  ]);
 
-  const levelCommunity = await prisma.community.findFirst({
-    where: {
-      schoolId: user.schoolId,
-      fieldOfStudyId: null,
-      levelId: user.levelId,
-      type: 'LEVEL_ONLY',
-    },
-  });
+  const communities = [fieldCommunity, levelCommunity, fieldLevelCommunity].filter(Boolean) as Array<
+    typeof fieldCommunity
+  >;
 
-  const fieldLevelCommunity = await prisma.community.findFirst({
-    where: {
-      schoolId: user.schoolId,
-      fieldOfStudyId: user.fieldOfStudyId,
-      levelId: user.levelId,
-      type: 'FIELD_AND_LEVEL',
-    },
-  });
-
-  const communities = [fieldCommunity, levelCommunity, fieldLevelCommunity].filter(
-    (c) => c !== null
-  ) as typeof fieldCommunity[];
-
-  // Add user to each community
+  // Idempotent membership assignment (no duplicates)
   for (const community of communities) {
-    // Check if already member
-    const existing = await prisma.communityMember.findUnique({
+    await prisma.communityMember.upsert({
       where: {
         userId_communityId: {
           userId,
-          communityId: community.id,
+          communityId: community!.id,
         },
       },
+      create: {
+        userId,
+        communityId: community!.id,
+        role: 'MEMBER',
+      },
+      update: {},
     });
-
-    if (!existing) {
-      await prisma.communityMember.create({
-        data: {
-          userId,
-          communityId: community.id,
-          role: 'MEMBER',
-        },
-      });
-    }
   }
 }
+
 
 /**
  * Remove student from auto-assigned communities (when user is deleted or rejected)

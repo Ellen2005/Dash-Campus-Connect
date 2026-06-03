@@ -44,15 +44,48 @@ export async function POST(request: NextRequest) {
   });
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 
-  // Update DB approval status and assign communities
+  // Run all DB changes in a single transaction so partial failures don't leave the system in a broken state.
   try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { approvalStatus: "APPROVED" },
+    await prisma.$transaction(async (tx) => {
+      // 1. Approve the user
+      await tx.user.update({
+        where: { id: userId },
+        data: { approvalStatus: "APPROVED" },
+      });
+
+      // 2. Send a notification so the student knows they're in.
+      await tx.notification.create({
+        data: {
+          userId,
+          type: "SYSTEM_ALERT",
+          title: "🎉 Your account has been approved!",
+          message:
+            "Welcome to Dash! You now have full access to the platform, your communities, and all features.",
+          actionUrl: "/main",
+        },
+      });
+
+      // 3. Activity log entry
+      await tx.activityLog.create({
+        data: {
+          userId,
+          action: "STUDENT_APPROVED",
+          resource: "user",
+        },
+      });
     });
+
+    // 4. Assign communities (manages its own idempotent upserts outside the tx)
     await assignStudentToCommunities(userId);
   } catch (e) {
-    console.warn("[approve-user] DB update/community assignment failed (non-fatal):", e);
+    console.error("[approve-user] DB transaction failed:", e);
+    return NextResponse.json(
+      {
+        error:
+          "Approval succeeded in auth, but the database update failed. Please contact support.",
+      },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ success: true }, { status: 200 });

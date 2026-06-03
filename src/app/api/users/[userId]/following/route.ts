@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -13,32 +12,31 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
 
-    const following = await prisma.follow.findMany({
-      where: { followerId: userId },
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        following: {
-          select: {
-            id: true,
-            name: true,
-            profilePhoto: true,
-            username: true,
-            bio: true,
-            major: true,
-            year: true,
+    const [following, total] = await Promise.all([
+      prisma.follow.findMany({
+        where: { followerId: userId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          following: {
+            select: {
+              id: true,
+              name: true,
+              profilePhoto: true,
+              username: true,
+              bio: true,
+              fieldOfStudy: { select: { name: true } },
+              level: { select: { name: true } },
+            },
           },
         },
-      },
-    })
-
-    const total = await prisma.follow.count({
-      where: { followerId: userId },
-    })
+      }),
+      prisma.follow.count({ where: { followerId: userId } }),
+    ])
 
     return NextResponse.json({
-      following: following.map(f => f.following),
+      following: following.map((f) => f.following),
       pagination: {
         page,
         limit,

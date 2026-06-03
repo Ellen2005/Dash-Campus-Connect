@@ -59,8 +59,12 @@ export async function uploadFile(
 
   const ext = file.name.split(".").pop() ?? "bin";
   const safeName = sanitizeFileName(`${userId}_${Date.now()}.${ext}`);
+  // Use a deterministic per-user prefix.
   const path = `${userId}/${safeName}`;
 
+  // NOTE:
+  // If your Supabase buckets are NOT public, `uploadFile` should use signed URLs.
+  // However, your codebase currently expects `publicUrl`, so we attempt getPublicUrl.
   const { error: uploadError } = await supabase.storage
     .from(bucket)
     .upload(path, file, { upsert: false, contentType: file.type });
@@ -72,6 +76,7 @@ export async function uploadFile(
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return { url: data.publicUrl, error: null };
 }
+
 
 export async function deleteFile(bucket: UploadBucket, path: string): Promise<void> {
   await supabase.storage.from(bucket).remove([path]);
