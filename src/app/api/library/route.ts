@@ -21,6 +21,12 @@ export async function GET(request: Request) {
       ];
     }
 
+    // Check if libraryResource model exists in the schema
+    if (!prisma.libraryResource) {
+      console.warn("[library] libraryResource model not found in Prisma client, returning empty");
+      return NextResponse.json({ resources: [] });
+    }
+
     const resources = await prisma.libraryResource.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -46,6 +52,10 @@ export async function POST(request: Request) {
 
     if (!title || !type || !schoolId || !uploadedById) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (!prisma.libraryResource) {
+      return NextResponse.json({ error: "Library feature not yet available in database" }, { status: 503 });
     }
 
     const resource = await prisma.libraryResource.create({

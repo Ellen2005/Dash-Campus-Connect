@@ -1,89 +1,70 @@
-import { prisma } from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
+import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
-
-const CheckInSchema = z.object({
-  userId: z.string(),
-  qrCode: z.string().optional(), // For QR code validation
-})
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ eventId: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ eventId: string }> }) {
+  const { eventId } = await params;
   try {
-    const { eventId } = await params
-    const body = await request.json()
-    const { userId, qrCode } = CheckInSchema.parse(body)
+    const body = await req.json();
+    const { userId } = body;
 
-    // Check if user is RSVP'd to the event
+    if (!userId) {
+      return NextResponse.json({ error: "userId required" }, { status: 400 });
+    }
+
+    // Verify user is an attendee
     const attendee = await prisma.eventAttendee.findUnique({
-      where: {
-        userId_eventId: {
-          userId,
-          eventId,
-        },
-      },
-    })
+      where: { userId_eventId: { userId, eventId } },
+    });
 
     if (!attendee) {
-      return NextResponse.json({ error: 'User is not RSVP\'d to this event' }, { status: 400 })
+      return NextResponse.json({ error: "User is not an attendee of this event" }, { status: 403 });
     }
 
-    // Check QR code if provided
-    if (qrCode) {
-      const event = await prisma.event.findUnique({
-        where: { id: eventId },
-        select: { qrCheckIn: true },
-      })
-
-      if (!event?.qrCheckIn || event.qrCheckIn !== qrCode) {
-        return NextResponse.json({ error: 'Invalid QR code' }, { status: 400 })
-      }
+    if (attendee.checkedIn) {
+      return NextResponse.json({ success: true, alreadyCheckedIn: true });
     }
 
-    // Update check-in status
-    const updatedAttendee = await prisma.eventAttendee.update({
-      where: {
-        userId_eventId: {
-          userId,
-          eventId,
-        },
-      },
+    await prisma.eventAttendee.update({
+      where: { id: attendee.id },
+      data: { checkedIn: true },
+    });
+
+    // Log the check-in
+    await prisma.activityLog.create({
       data: {
-        checkedIn: true,
+        userId,
+        action: "EVENT_CHECKIN",
+        resource: `event:${eventId}`,
       },
+    });
+
+    return NextResponse.json({ success: true, alreadyCheckedIn: false });
+  } catch (error) {
+    console.error("[checkin] Error:", error);
+    return NextResponse.json({ error: "Failed to check in" }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ eventId: string }> }) {
+  const { eventId } = await params;
+  try {
+    const attendees = await prisma.eventAttendee.findMany({
+      where: { eventId, checkedIn: true },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            profilePhoto: true,
-          },
-        },
-        event: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-            location: true,
-          },
+          select: { id: true, name: true, username: true, profilePhoto: true },
         },
       },
-    })
+      orderBy: { joinedAt: "desc" },
+    });
 
-    return NextResponse.json({
-      success: true,
-      attendee: updatedAttendee,
-      message: 'Successfully checked in to event',
-    })
+    const count = await prisma.eventAttendee.count({
+      where: { eventId, checkedIn: true },
+    });
+
+    return NextResponse.json({ checkedIn: attendees, count });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
-    }
-
-    console.error('Error checking in to event:', error)
-    return NextResponse.json({ error: 'Failed to check in to event' }, { status: 500 })
+    console.error("[checkin GET] Error:", error);
+    return NextResponse.json({ error: "Failed to fetch check-ins" }, { status: 500 });
   }
 }

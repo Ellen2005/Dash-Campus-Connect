@@ -1,100 +1,50 @@
-import { prisma } from '@/lib/prisma'
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
+import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
-
-const RSVPSchema = z.object({
-  userId: z.string(),
-  status: z.enum(['INTERESTED', 'GOING', 'MAYBE', 'NOT_GOING']),
-})
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ eventId: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ eventId: string }> }) {
+  const { eventId } = await params;
   try {
-    const { eventId } = await params
-    const body = await request.json()
-    const { userId, status } = RSVPSchema.parse(body)
-
-    // Check if event exists
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      select: { id: true, capacity: true, _count: { select: { attendees: true } } },
-    })
-
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    const body = await req.json();
+    const { userId, status } = body;
+    if (!userId || !status) {
+      return NextResponse.json({ error: "userId and status required" }, { status: 400 });
     }
 
-    // Check capacity if trying to RSVP as GOING
-    if (status === 'GOING' && event.capacity && event._count.attendees >= event.capacity) {
-      return NextResponse.json({ error: 'Event is at capacity' }, { status: 400 })
-    }
+    const existing = await prisma.eventAttendee.findUnique({
+      where: { userId_eventId: { userId, eventId } },
+    });
 
-    // Upsert RSVP (create or update)
-    const rsvp = await prisma.eventAttendee.upsert({
-      where: {
-        userId_eventId: {
-          userId,
-          eventId,
-        },
-      },
-      update: {
-        status,
-      },
-      create: {
-        userId,
-        eventId,
-        status,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            profilePhoto: true,
+    if (existing) {
+      await prisma.eventAttendee.update({
+        where: { id: existing.id },
+        data: { status: status as any },
+      });
+    } else {
+      await prisma.eventAttendee.create({
+        data: { userId, eventId, status: status as any },
+      });
+
+      // Create notification for event organizer
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { organizerId: true, title: true },
+      });
+      if (event && event.organizerId !== userId) {
+        await prisma.notification.create({
+          data: {
+            userId: event.organizerId,
+            type: "EVENT_REMINDER",
+            title: "New RSVP",
+            message: `Someone is ${status.toLowerCase()} to your event: ${event.title}`,
+            actionUrl: `/main/events/${eventId}`,
           },
-        },
-      },
-    })
-
-    return NextResponse.json(rsvp)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
+        });
+      }
     }
 
-    console.error('Error RSVPing to event:', error)
-    return NextResponse.json({ error: 'Failed to RSVP to event' }, { status: 500 })
-  }
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ eventId: string }> }
-) {
-  try {
-    const { eventId } = await params
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId parameter required' }, { status: 400 })
-    }
-
-    const rsvp = await prisma.eventAttendee.findUnique({
-      where: {
-        userId_eventId: {
-          userId,
-          eventId,
-        },
-      },
-    })
-
-    return NextResponse.json({ rsvp })
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error fetching RSVP:', error)
-    return NextResponse.json({ error: 'Failed to fetch RSVP' }, { status: 500 })
+    console.error("[rsvp] Error:", error);
+    return NextResponse.json({ error: "Failed to RSVP" }, { status: 500 });
   }
 }
