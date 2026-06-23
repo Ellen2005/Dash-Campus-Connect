@@ -129,6 +129,39 @@ export default function SupportPage() {
         ))}
       </div>
 
+      {/* FAQ Section */}
+      <div className="dash-card p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <HelpCircle className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-base">{t("frequentlyAskedQuestions")}</h2>
+            <p className="text-[11px] text-muted-foreground">{t("faqSubtitle")}</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {[
+            { q: "How do I reset my password?", a: "Go to Settings > Security and click 'Reset Password'. You'll receive an email with instructions." },
+            { q: "How do I join a community?", a: "Navigate to Communities, browse or search for your field/level, and click 'Join'. Some communities may require approval." },
+            { q: "How do I report inappropriate content?", a: "Click the three dots on any post and select 'Report'. Our moderation team will review it within 24 hours." },
+            { q: "Can I change my username?", a: "Yes, go to Settings > Profile and click 'Edit Profile'. Usernames must be unique across the platform." },
+            { q: "How do I sell items on Marketplace?", a: "Go to Marketplace, click 'Create Listing', fill in the details, and publish. Your listing will be visible to all students." },
+          ].map((faq, i) => (
+            <details key={i} className="group bg-muted/20 rounded-xl border border-border">
+              <summary className="flex items-center justify-between p-4 cursor-pointer text-sm font-medium hover:text-primary transition-colors">
+                {faq.q}
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" />
+              </summary>
+              <div className="px-4 pb-4 text-xs text-muted-foreground leading-relaxed">
+                {faq.a}
+              </div>
+            </details>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Submit Ticket */}
         <div className="dash-card p-5 space-y-5">
