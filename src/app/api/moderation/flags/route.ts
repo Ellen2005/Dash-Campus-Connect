@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
-import { requireAdminOrStudentAdmin } from "@/lib/require-admin-or-student-admin";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -9,18 +8,43 @@ const CreateFlagSchema = z.object({
   listingId: z.string().optional(),
   reason: z.string().min(1).max(500),
   details: z.string().max(2000).optional(),
-  reporterId: z.string().optional(), // Will be overridden by session user
+  reporterId: z.string().optional(),
 }).refine((d) => d.postId || d.listingId, {
   message: "Either postId or listingId must be provided",
 });
 
+async function getSession() {
+  try {
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+async function getSchoolScope(session: any): Promise<string | null> {
+  if (!session?.user) return null;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { schoolId: true, role: true, isStudentAdmin: true },
+    });
+    if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") return null; // super admin sees all
+    if (user?.isStudentAdmin) return user.schoolId;
+    return user?.schoolId || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: NextRequest) {
-  const { session, errorResponse } = await requireAdminOrStudentAdmin();
-  if (errorResponse) return errorResponse;
+  const session = await getSession();
+  const schoolScope = await getSchoolScope(session);
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") || "PENDING";
-  const schoolId = searchParams.get("schoolId");
+  const schoolId = searchParams.get("schoolId") || schoolScope;
 
   try {
     const where: any = { status: status as any };
