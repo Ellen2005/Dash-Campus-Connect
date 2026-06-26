@@ -19,9 +19,11 @@ export async function GET(request: NextRequest) {
   try {
     // Try auth for following feed, but allow public read for profile
     let currentUserId: string | undefined;
+    let currentUserSchoolId: string | undefined;
     try {
-      const { user } = await requireUser();
+      const { user, dbUser } = await requireUser();
       currentUserId = user.userId;
+      currentUserSchoolId = dbUser?.schoolId ?? undefined;
     } catch {
       // Allow public access for profile/author queries
     }
@@ -37,6 +39,12 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')?.trim() || currentUserId
 
     const where: any = { isFlagged: false } // Hide flagged posts
+    
+    // Multi-tenant isolation: Only fetch posts from the same school if we aren't querying a specific author
+    if (!authorId && currentUserSchoolId) {
+      where.author = { schoolId: currentUserSchoolId };
+    }
+
     if (authorId) where.authorId = authorId
     if (groupPostId) where.groupPostId = groupPostId
     if (today) {

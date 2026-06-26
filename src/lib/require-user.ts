@@ -15,12 +15,17 @@ export interface AuthResult {
     approvalStatus: string;
     schoolId: string | null;
   };
+  user: {
+    userId: string;
+    dbUser: AuthResult["dbUser"];
+  };
   errorResponse: null;
 }
 
 export interface AuthError {
   userId: null;
   dbUser: null;
+  user: null;
   errorResponse: NextResponse;
 }
 
@@ -33,6 +38,7 @@ export async function requireUser(): Promise<AuthResult | AuthError> {
       return {
         userId: null,
         dbUser: null,
+        user: null,
         errorResponse: NextResponse.json(
           { error: "Authentication required" },
           { status: 401 }
@@ -55,6 +61,7 @@ export async function requireUser(): Promise<AuthResult | AuthError> {
       return {
         userId: null,
         dbUser: null,
+        user: null,
         errorResponse: NextResponse.json(
           { error: "User not found" },
           { status: 404 }
@@ -66,6 +73,7 @@ export async function requireUser(): Promise<AuthResult | AuthError> {
       return {
         userId: null,
         dbUser: null,
+        user: null,
         errorResponse: NextResponse.json(
           { error: "Account suspended. Contact your school admin." },
           { status: 403 }
@@ -77,6 +85,7 @@ export async function requireUser(): Promise<AuthResult | AuthError> {
       return {
         userId: null,
         dbUser: null,
+        user: null,
         errorResponse: NextResponse.json(
           { error: "Account pending approval" },
           { status: 403 }
@@ -84,12 +93,18 @@ export async function requireUser(): Promise<AuthResult | AuthError> {
       };
     }
 
-    return { userId: user.id, dbUser, errorResponse: null };
+    return { 
+      userId: user.id, 
+      dbUser, 
+      user: { userId: user.id, dbUser },
+      errorResponse: null 
+    };
   } catch (e) {
     console.error("[requireUser] Error:", e);
     return {
       userId: null,
       dbUser: null,
+      user: null,
       errorResponse: NextResponse.json(
         { error: "Failed to verify authentication" },
         { status: 500 }

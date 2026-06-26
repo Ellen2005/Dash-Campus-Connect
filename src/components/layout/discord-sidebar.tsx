@@ -157,7 +157,6 @@ export function ChannelSidebar() {
       channels: [
         { name: t("feed"),        icon: Megaphone,   href: "/main",             badge: undefined },
         { name: "general",        icon: Hash,        href: "/main/general" },
-        { name: t("library"),     icon: Library,     href: "/main/library" },
         { name: t("events"),      icon: BookOpen,    href: "/main/events" },
         { name: t("search"),      icon: Search,      href: "/main/search" },
       ],

@@ -1,4 +1,5 @@
 "use client";
+import '@/app/main/communities/[communityId]/CommunityDetail.module.css';
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -124,7 +125,7 @@ export default function CommunityDetailPage() {
   return (
     <div className="space-y-5 pb-16 page-enter">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.back()}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.back()} aria-label="Go back">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -192,7 +193,7 @@ export default function CommunityDetailPage() {
           )}
           <div className="flex justify-between items-center">
             <div>
-              <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => e.target.files?.[0] && setSelectedFile(e.target.files[0])} />
+              <input type="file" ref={fileInputRef} className="hidden" aria-label="Attach file" onChange={(e) => e.target.files?.[0] && setSelectedFile(e.target.files[0])} />
               <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip className="w-3.5 h-3.5" /> Attach File
               </Button>
@@ -212,7 +213,7 @@ export default function CommunityDetailPage() {
             {canPost && <p className="text-xs mt-1">Be the first to post!</p>}
           </div>
         ) : posts.map((post, i) => (
-          <div key={post.id} className="dash-card p-4 space-y-2 animate-in fade-in duration-200" style={{ animationDelay: `${i * 40}ms` }}>
+          <div key={post.id} className="dash-card p-4 space-y-2 animate-in fade-in duration-200 post-card" data-delay={i * 40}>
             <div className="flex items-center gap-2">
               <Avatar className="w-7 h-7">
                 <AvatarFallback className="text-[10px] bg-primary/15 text-primary">

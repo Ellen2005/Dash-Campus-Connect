@@ -105,7 +105,8 @@ export default function GroupDetailPage({ params }: { params: Promise<{ groupId:
     );
   }
 
-  const members = group.members || group._count?.members || 0;
+  const membersArray = group.members && Array.isArray(group.members) ? group.members : [];
+  const memberCount = membersArray.length > 0 ? membersArray.length : (group._count?.members || 0);
   const isPublic = group.isPublic !== false;
 
   return (
@@ -131,7 +132,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ groupId:
               {isPublic ? <Globe className="w-4 h-4 text-muted-foreground" /> : <Lock className="w-4 h-4 text-muted-foreground" />}
             </div>
             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-              <Users className="w-3.5 h-3.5" /> {members} members
+              <Users className="w-3.5 h-3.5" /> {memberCount} members
             </p>
             {group.description && (
               <p className="text-xs text-muted-foreground mt-2">{group.description}</p>
@@ -147,7 +148,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ groupId:
             Posts
           </TabsTrigger>
           <TabsTrigger value="members" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-0 py-2.5 text-sm font-medium text-muted-foreground">
-            Members ({members})
+            Members ({memberCount})
           </TabsTrigger>
           <TabsTrigger value="files" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-0 py-2.5 text-sm font-medium text-muted-foreground">
             Shared Files

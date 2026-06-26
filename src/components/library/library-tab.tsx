@@ -102,6 +102,10 @@ export function LibraryTab({ schoolId }: { schoolId?: string }) {
       let finalContent = textContent;
 
       if (uploadFile_) {
+        if (type === "PDF" && !uploadFile_.type.includes("pdf")) throw new Error("File must be a PDF");
+        if (type === "VIDEO" && !uploadFile_.type.startsWith("video/")) throw new Error("File must be a video");
+        if (type === "IMAGE" && !uploadFile_.type.startsWith("image/")) throw new Error("File must be an image");
+
         const { url, error } = await uploadFile(uploadFile_, "library", dashUser.id);
         if (error) throw new Error(error);
         finalUrl = url;
@@ -160,7 +164,7 @@ export function LibraryTab({ schoolId }: { schoolId?: string }) {
           <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search resources..." className="pl-10 h-9 text-sm bg-muted/30" />
           {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>}
         </div>
-        <Button size="sm" className="dash-button-primary h-8 text-xs gap-1.5" onClick={() => setAddOpen(true)}>
+        <Button size="sm" className="dash-button-primary h-8 text-xs gap-1.5" onClick={() => setAddOpen(true)} aria-label="Add" >
           <Plus className="w-3.5 h-3.5" /> Add
         </Button>
       </div>
@@ -273,7 +277,31 @@ export function LibraryTab({ schoolId }: { schoolId?: string }) {
                   </Button>
                   <span className="text-[10px] text-muted-foreground">{uploadFile_ ? uploadFile_.name : "No file selected"}</span>
                 </div>
-                <input ref={setFileRef} type="file" hidden onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+                <input 
+                  ref={setFileRef} 
+                  type="file" 
+                  hidden 
+                  accept={type === "PDF" ? "application/pdf" : type === "VIDEO" ? "video/*" : type === "IMAGE" ? "image/*" : undefined}
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return setUploadFile(null);
+                    
+                    if (type === "PDF" && !file.type.includes("pdf")) {
+                      toast({ title: "Invalid File", description: "Please upload a valid PDF file.", variant: "destructive" });
+                      return;
+                    }
+                    if (type === "VIDEO" && !file.type.startsWith("video/")) {
+                      toast({ title: "Invalid File", description: "Please upload a valid video file.", variant: "destructive" });
+                      return;
+                    }
+                    if (type === "IMAGE" && !file.type.startsWith("image/")) {
+                      toast({ title: "Invalid File", description: "Please upload a valid image file.", variant: "destructive" });
+                      return;
+                    }
+                    
+                    setUploadFile(file);
+                  }} 
+                />
               </div>
             )}
             {type === "LINK" && (

@@ -23,7 +23,7 @@ const CreateEventSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  const { user, errorResponse } = await requireUser();
+  const { user, dbUser, errorResponse } = await requireUser();
   if (errorResponse) return errorResponse;
 
   try {
@@ -40,7 +40,9 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('isFree') === 'true' ? true : searchParams.get('isFree') === 'false' ? false : undefined
     const search = searchParams.get('search')
 
-    let where: any = {}
+    let where: any = {
+      organizer: { schoolId: dbUser.schoolId }
+    }
 
     // Status filtering (overrides default APPROVED)
     const currentUserId = searchParams.get('currentUserId')

@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
     // Try cookie auth for school isolation, but allow unauthenticated access for public data
     let schoolId: string | undefined;
     try {
-      const { user } = await requireUser();
-      schoolId = user.dbUser.schoolId;
+      const { user, dbUser } = await requireUser();
+      schoolId = dbUser.schoolId ?? undefined;
     } catch {
       // Allow unauthenticated access - groups are public data
     }
@@ -45,25 +45,40 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const creatorId = searchParams.get('creatorId')
 
-    let where: any = {}
+    let AND: any[] = []
 
-    // Type filter
-    if (type) {
-      where.type = type
+    // Multi-tenant isolation: Only fetch groups from the same school
+    if (schoolId) {
+      AND.push({
+        OR: [
+          { creator: { schoolId: schoolId } },
+          { members: { some: { user: { schoolId: schoolId } } } }
+        ]
+      })
     }
 
+    // Type filter
+    if (type) AND.push({ type })
+
     // Other filters
-    if (department) where.department = department
-    if (year) where.year = year
-    if (isPublic !== undefined) where.isPublic = isPublic
-    if (creatorId) where.creatorId = creatorId
+    if (department) AND.push({ department })
+    if (year) AND.push({ year })
+    if (isPublic !== undefined) AND.push({ isPublic })
+    if (creatorId) AND.push({ creatorId })
 
     // Search
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ]
+      AND.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ]
+      })
+    }
+    
+    let where: any = {}
+    if (AND.length > 0) {
+      where.AND = AND
     }
 
     const groups = await prisma.group.findMany({
