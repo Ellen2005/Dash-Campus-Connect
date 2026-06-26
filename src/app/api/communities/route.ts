@@ -21,9 +21,11 @@ export async function GET(req: NextRequest) {
     let resolvedUserId = userId;
     
     if (!resolvedSchoolId || !resolvedUserId) {
-      const { user } = await requireUser();
-      resolvedSchoolId = resolvedSchoolId ?? user.dbUser.schoolId;
-      resolvedUserId = resolvedUserId ?? user.userId;
+      const result = await requireUser();
+      if (!result.errorResponse && result.dbUser) {
+        resolvedSchoolId = resolvedSchoolId ?? result.dbUser.schoolId;
+        resolvedUserId = resolvedUserId ?? result.userId;
+      }
     }
 
     if (!resolvedSchoolId) return NextResponse.json({ error: "schoolId required." }, { status: 400 });

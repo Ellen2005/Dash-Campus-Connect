@@ -12,13 +12,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tic
   // Verify access (must be admin/studentAdmin or the ticket creator)
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: ticketId },
-    select: { authorId: true, schoolId: true },
+    select: { userId: true },
   });
 
   if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
 
   const isAdmin = dbUser?.role === "ADMIN" || dbUser?.role === "SUPER_ADMIN" || dbUser?.isStudentAdmin;
-  if (!isAdmin && ticket.authorId !== userId) {
+  if (!isAdmin && ticket.userId !== userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
@@ -43,14 +43,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
   // Verify access
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: ticketId },
-    select: { authorId: true, status: true },
+    select: { userId: true, status: true, user: { select: { schoolId: true } } },
   });
 
   if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
 
   const isFullAdmin = dbUser?.role === "ADMIN" || dbUser?.role === "SUPER_ADMIN";
-  const isStudentAdmin = dbUser?.isStudentAdmin;
-  const isAuthor = ticket.authorId === userId;
+  const isAuthor = ticket.userId === userId;
 
   if (!isFullAdmin && !isAuthor) {
     return NextResponse.json({ error: "Unauthorized to reply to this ticket" }, { status: 403 });
@@ -82,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
     // Notify the student that admin replied
     const { createNotification } = await import("@/lib/notifications");
     await createNotification({
-      userId: ticket.authorId,
+      userId: ticket.userId,
       type: "SUPPORT_REPLY",
       title: "Support Ticket Update",
       message: "An admin has replied to your support ticket.",
@@ -90,15 +89,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
     });
   } else if (isAuthor) {
     // Notify admins that student replied
-    const ticketWithUser = await prisma.supportTicket.findUnique({
-      where: { id: ticketId },
-      include: { user: { select: { schoolId: true } } },
-    });
+    const ticketSchoolId = ticket.user?.schoolId;
 
-    if (ticketWithUser?.user.schoolId) {
+    if (ticketSchoolId) {
       const adminsToNotify = await prisma.user.findMany({
         where: {
-          schoolId: ticketWithUser.user.schoolId,
+          schoolId: ticketSchoolId,
           OR: [{ role: "ADMIN" }, { role: "SUPER_ADMIN" }, { isStudentAdmin: true }],
         },
         select: { id: true },
@@ -112,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tic
               userId: admin.id,
               type: "SUPPORT_REPLY",
               title: "Support Ticket Reply",
-              message: `A student replied to support ticket: ${ticketWithUser.title}`,
+              message: "A student replied to a support ticket.",
               actionUrl: `/main/support/${ticketId}`,
             })
           )

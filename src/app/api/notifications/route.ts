@@ -10,8 +10,10 @@ export async function GET(request: Request) {
     // Try cookie auth first, fall back to query param for backward compatibility
     let resolvedUserId = userId;
     if (!resolvedUserId) {
-      const { user } = await requireUser();
-      resolvedUserId = user.userId;
+      const result = await requireUser();
+      if (!result.errorResponse && result.user) {
+        resolvedUserId = result.user.userId;
+      }
     }
 
     const notifications = await prisma.notification.findMany({

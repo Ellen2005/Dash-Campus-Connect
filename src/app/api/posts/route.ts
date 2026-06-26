@@ -21,15 +21,17 @@ export async function GET(request: NextRequest) {
     let currentUserId: string | undefined;
     let currentUserSchoolId: string | undefined;
     try {
-      const { user, dbUser } = await requireUser();
-      currentUserId = user.userId;
-      currentUserSchoolId = dbUser?.schoolId ?? undefined;
+      const result = await requireUser();
+      if (!result.errorResponse && result.user) {
+        currentUserId = result.user.userId;
+        currentUserSchoolId = result.dbUser?.schoolId ?? undefined;
+      }
     } catch {
       // Allow public access for profile/author queries
     }
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '10'))) // Cap at 50 to prevent OOM
     const skip = (page - 1) * limit
 
     const authorId = searchParams.get('authorId')?.trim()

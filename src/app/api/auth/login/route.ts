@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, ipFromRequest } from "@/lib/rate-limit";
 
 // Must match the format used in register
 function toSyntheticEmail(studentId: string, schoolId: string): string {
@@ -17,9 +18,24 @@ const LoginSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 attempts per IP per minute, 3 attempts per studentId per minute
+  const ipKey = `login:ip:${ipFromRequest(request)}`;
+  const ipLimiter = rateLimit(ipKey, 20, 60_000); // 20 attempts per IP per minute (shared across students)
+  if (!ipLimiter.allowed) return ipLimiter.response;
+
   try {
     const body = await request.json();
-    const { studentId, schoolId, password } = LoginSchema.parse(body);
+    const parsed = LoginSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid request data." }, { status: 400 });
+    }
+
+    const { studentId, schoolId, password } = parsed.data;
+
+    // Stricter rate limit per student ID: 5 attempts per minute
+    const studentKey = `login:student:${studentId}`;
+    const studentLimiter = rateLimit(studentKey, 5, 60_000);
+    if (!studentLimiter.allowed) return studentLimiter.response;
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

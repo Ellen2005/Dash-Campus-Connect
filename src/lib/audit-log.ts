@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 type AuditAction =
   | "USER_APPROVED"
@@ -29,14 +30,12 @@ export async function logAudit({
   schoolId: string;
 }) {
   try {
-    await prisma.auditLog.create({
+    // ActivityLog is the correct model name per schema.prisma
+    await prisma.activityLog.create({
       data: {
-        actorId,
+        userId: actorId,
         action,
-        targetType,
-        targetId,
-        details: details ?? {},
-        schoolId,
+        resource: `${targetType}${targetId ? `:${targetId}` : ""}`,
       },
     });
   } catch (error) {

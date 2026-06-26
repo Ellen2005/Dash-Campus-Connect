@@ -12,38 +12,35 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  const isLocalDb = /localhost|127\.0\.0\.1/.test(connectionString);
-  if (!isLocalDb) {
-    if (
-      process.env.NODE_ENV !== "production" &&
-      process.env.ALLOW_SELF_SIGNED_DB_CERT !== "false"
-    ) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    }
-
-    try {
-      const url = new URL(connectionString);
-      url.searchParams.delete("sslmode");
-      if (!url.searchParams.has("uselibpqcompat")) {
-        url.searchParams.set("uselibpqcompat", "true");
-      }
-      connectionString = url.toString();
-    } catch {
-      // Keep original string if URL parsing fails.
-    }
-  }
-
-  const rejectUnauthorized =
-    process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true";
-
   const pool = new Pool({
     connectionString,
-    ...(isLocalDb
-      ? {}
-      : { ssl: { rejectUnauthorized } }),
+    max: 5,                          // Limit concurrent connections to prevent pool exhaustion
+    idleTimeoutMillis: 30000,         // Close idle connections after 30s
+    connectionTimeoutMillis: 10000,   // Fail fast if can't connect (no more 3.5min hangs)
+    allowExitOnIdle: true,
+    ssl: process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: true } // Proper SSL verification in production
+      : false,                        // No SSL needed for local dev (localhost)
   });
+
+  // Set query-level timeouts to prevent hanging queries
+  pool.on("connect", (client) => {
+    client.query("SET statement_timeout = 30000");            // 30s max per query
+    client.query("SET idle_in_transaction_session_timeout = 60000"); // 60s idle tx timeout
+  });
+
+  // Handle pool errors gracefully — don't crash the process
+  pool.on("error", (err) => {
+    console.error("[prisma] Unexpected pool error:", err.message);
+  });
+
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter } as any);
+  return new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === "development"
+      ? ["warn", "error"]
+      : ["error"],
+  });
 }
 
 export const prisma: PrismaClient =

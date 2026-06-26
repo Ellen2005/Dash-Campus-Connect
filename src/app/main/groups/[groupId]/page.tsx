@@ -170,7 +170,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ groupId:
                   <FileText className="w-4 h-4 text-primary" />
                   <span className="truncate">{selectedFile.name}</span>
                 </div>
-                <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="text-muted-foreground hover:text-destructive">
+                <button type="button"   title="Remove selected file" aria-label="Remove selected file" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="text-muted-foreground hover:text-destructive">
                   <X className="w-4 h-4" />
                 </button>
               </div>

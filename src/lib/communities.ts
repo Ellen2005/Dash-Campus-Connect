@@ -109,6 +109,13 @@ export async function assignStudentToCommunities(userId: string) {
     throw new Error('User must have school, field, and level assigned');
   }
 
+  // Guard against null relations - TypeScript strict mode requires this
+  const fieldOfStudy = user.fieldOfStudy;
+  const level = user.level;
+  if (!fieldOfStudy || !level) {
+    throw new Error('User field of study or level data is missing');
+  }
+
   // Ensure field-only community exists
   let fieldCommunity = await prisma.community.findFirst({
     where: {
@@ -121,8 +128,8 @@ export async function assignStudentToCommunities(userId: string) {
   if (!fieldCommunity) {
     fieldCommunity = await prisma.community.create({
       data: {
-        name: `${user.fieldOfStudy.name} Students`,
-        description: `Community for all ${user.fieldOfStudy.name} students`,
+        name: `${fieldOfStudy.name} Students`,
+        description: `Community for all ${fieldOfStudy.name} students`,
         type: 'FIELD_ONLY',
         schoolId: user.schoolId,
         fieldOfStudyId: user.fieldOfStudyId,
@@ -143,8 +150,8 @@ export async function assignStudentToCommunities(userId: string) {
   if (!levelCommunity) {
     levelCommunity = await prisma.community.create({
       data: {
-        name: `Level ${user.level.name}`,
-        description: `Community for all students in Level ${user.level.name}`,
+        name: `Level ${level.name}`,
+        description: `Community for all students in Level ${level.name}`,
         type: 'LEVEL_ONLY',
         schoolId: user.schoolId,
         levelId: user.levelId,
@@ -165,8 +172,8 @@ export async function assignStudentToCommunities(userId: string) {
   if (!fieldLevelCommunity) {
     fieldLevelCommunity = await prisma.community.create({
       data: {
-        name: `${user.fieldOfStudy.name} - ${user.level.name}`,
-        description: `Community for ${user.fieldOfStudy.name} students in ${user.level.name}`,
+        name: `${fieldOfStudy.name} - ${level.name}`,
+        description: `Community for ${fieldOfStudy.name} students in ${level.name}`,
         type: 'FIELD_AND_LEVEL',
         schoolId: user.schoolId,
         fieldOfStudyId: user.fieldOfStudyId,

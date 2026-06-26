@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
     // Try cookie auth for school isolation, but allow unauthenticated access for public data
     let schoolId: string | undefined;
     try {
-      const { user, dbUser } = await requireUser();
-      schoolId = dbUser.schoolId ?? undefined;
+      const result = await requireUser();
+      if (!result.errorResponse && result.dbUser) {
+        schoolId = result.dbUser.schoolId ?? undefined;
+      }
     } catch {
       // Allow unauthenticated access - groups are public data
     }
