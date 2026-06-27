@@ -1,29 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/require-user";
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      return NextResponse.json({ count: 0 });
-    }
-
-    const dashUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true },
-    });
-
-    if (!dashUser) {
-      return NextResponse.json({ count: 0 });
-    }
+    const auth = await requireUser();
+    if (auth.errorResponse) return NextResponse.json({ count: 0 });
 
     const count = await prisma.notification.count({
-      where: { userId: dashUser.id, isRead: false },
+      where: { userId: auth.userId, isRead: false },
     });
 
-    return NextResponse.json({ count });
+    return NextResponse.json({ count }, {
+      headers: { 'Cache-Control': 'public, max-age=10, s-maxage=15, stale-while-revalidate=30' },
+    });
   } catch {
     return NextResponse.json({ count: 0 });
   }

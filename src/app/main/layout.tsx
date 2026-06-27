@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { ServerSidebar, ChannelSidebar } from "@/components/layout/discord-sidebar";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Home, ShoppingBag, CalendarDays, LifeBuoy, User, Bell, Menu, TrendingUp, Search, X, Settings, Shield, MessageCircle, Loader2 } from "lucide-react";
@@ -11,7 +10,10 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { DashLogo } from "@/components/shared/dash-logo";
 import { useAuth } from "@/lib/auth-context";
-import { RightSidebar } from "@/components/layout/right-sidebar";
+
+const ServerSidebar = lazy(() => import("@/components/layout/discord-sidebar").then(m => ({ default: m.ServerSidebar })));
+const ChannelSidebar = lazy(() => import("@/components/layout/discord-sidebar").then(m => ({ default: m.ChannelSidebar })));
+const RightSidebar = lazy(() => import("@/components/layout/right-sidebar").then(m => ({ default: m.RightSidebar })));
 
 const mobileNavItems = (t: (k: any) => string) => [
   { href: "/main",              icon: Home,        label: t("feed") },
@@ -126,9 +128,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <div className="flex min-h-screen bg-background">
       {/* Left sidebars */}
       <div className="flex h-screen sticky top-0 z-30">
-        <ServerSidebar />
+        <Suspense fallback={<div className="w-16" />}><ServerSidebar /></Suspense>
         <div className="hidden lg:flex flex-col h-full border-r border-border">
-          <ChannelSidebar />
+          <Suspense fallback={<div className="w-60" />}><ChannelSidebar /></Suspense>
         </div>
       </div>
 
@@ -207,7 +209,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </div>
 
       {/* Right sidebar */}
-      <RightSidebar />
+      <Suspense fallback={null}><RightSidebar /></Suspense>
 
       {/* Mobile Drawer */}
       {drawerOpen && (

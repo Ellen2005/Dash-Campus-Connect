@@ -24,15 +24,19 @@
 - Added `/api/health` endpoint returning DB connectivity check
 - Added `DEMO_MODE=true` env var support in middleware to bypass rate limits (9999 req/min)
 - Removed seed scripts and demo-data entries from package.json
-- Added missing DB indexes: `EventAttendee(userId)`, `GroupMember(userId)`, `Post(groupPostId, audienceGroupId)`, `Mention(postId, commentId)`, `ChatGroup(members GIN)`, `CartItem(listingId)`, `OrderItem(listingId)`, `LibraryResource(uploadedById)`, `Notification(userId, isRead, createdAt)` composite
+- Added DB indexes: 10 models (EventAttendee, GroupMember, Post, Mention, ChatGroup GIN, CartItem, OrderItem, LibraryResource, Notification composite)
 - Optimized search route: filtered `followers` include (take:1) + `_count` instead of loading entire arrays; similarly for group `members`
+- **Fixed DB schema sync**: ran `prisma db push` to add missing `recipientId` column to Message table (was renamed but never migrated)
+- **Fixed search events tab**: added missing `<TabsContent value="events">` — tab trigger existed but content was missing
+- **Fixed community post attachments**: added `images`, `attachmentUrl`, `attachmentName` fields to CommunityPost model + API
+- **Fixed admin dashboard 401**: changed `/api/admin/users` (requires admin portal session) to `/api/campus-stats`
 - Build passes with zero errors
 
 ### In Progress
 - None
 
 ### Blocked
-- None
+- Supabase storage bucket "uploads" needs to be created manually in Supabase dashboard (Settings → Storage) for file uploads to use Supabase instead of base64 fallback
 
 ## Key Decisions
 - Used `DEMO_MODE` env var instead of hardcoding rate-limit bypass to keep production security intact
@@ -42,8 +46,7 @@
 - Replaced full `followers`/`following`/`members` array loads with `_count` + filtered `include (where, take:1)` pattern across all routes
 
 ## Next Steps
-- Add React performance optimizations (memo, dynamic imports) on heavy components (feed, sidebar, story viewer)
-- Add caching headers (stale-while-revalidate, CDN cache) to frequently-called GET endpoints
+- Create "uploads" bucket in Supabase dashboard (public bucket, 10MB limit, allow PDF/images/video)
 - Deploy with `DEMO_MODE=true` env var set for the presentation
 
 ## Critical Context
@@ -59,20 +62,13 @@
 - `src/lib/require-user.ts`: Auth middleware for all API routes
 - `src/middleware.ts`: Rate limiting + security headers + DEMO_MODE support
 - `src/app/api/health/route.ts`: Lightweight health check endpoint
-- `src/app/api/users/[userId]/route.ts`: Added notificationPrefs to GET select, privacyPublic to PATCH schema, replaced followers/following arrays with _count
-- `src/app/api/messages/route.ts`: Added unreadCount per conversation, fixed N+1
-- `src/app/api/messages/unread/route.ts`: New endpoint for total unread message count
-- `src/app/api/messages/[conversationId]/route.ts`: Auto mark-as-read on fetch
-- `src/app/api/admin/fields/route.ts`: Added requireAdminSession()
-- `src/app/api/admin/levels/route.ts`: Added requireAdminSession()
-- `src/app/api/analytics/export/route.ts`: Added admin role check
-- `src/app/api/sidebar/route.ts`: Optimized _count query
-- `src/app/api/search/route.ts`: Optimized followers/members queries with filtered includes + _count
-- `src/app/main/layout.tsx`: Dynamic unread counts in mobile nav + top bar
-- `src/components/layout/discord-sidebar.tsx`: Unread dots on Bell + MessageCircle
-- `src/app/main/messages/page.tsx`: Unread badges in conversation list
-- `src/app/main/profile/page.tsx`: Wired privacy toggle
-- `src/components/feed/story-section.tsx`: Fixed image error handling
-- `src/components/shared/story-viewer.tsx`: Fixed image error handling
-- `prisma/schema.prisma`: Added composite and missing indexes across 10 models
-- `next.config.ts`: Image remote patterns, WebP/AVIF formats, lucide-react tree-shaking
+- `src/app/api/upload/route.ts`: Uses "uploads" bucket, falls back to base64
+- `src/app/api/users/[userId]/route.ts`: Added notificationPrefs, privacyPublic, _count for followers
+- `src/app/api/messages/route.ts`: Unread counts, N+1 fix, recipientId fix
+- `src/app/api/messages/unread/route.ts`: Unread message count endpoint
+- `src/app/api/messages/[conversationId]/route.ts`: Auto mark-as-read
+- `src/app/api/communities/[communityId]/posts/route.ts`: Added images/attachment support
+- `src/app/api/search/route.ts`: Optimized queries + event filter fix
+- `src/app/main/admin/page.tsx`: Changed to /api/campus-stats for user count
+- `src/app/main/search/page.tsx`: Added missing Events tab content
+- `prisma/schema.prisma`: Indexes, recipientId, CommunityPost attachments

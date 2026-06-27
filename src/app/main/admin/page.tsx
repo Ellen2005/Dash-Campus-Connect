@@ -123,9 +123,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function loadStats() {
       try {
-        const usersRes = await fetch("/api/admin/users?limit=1").catch(() => null);
+        const usersRes = await fetch("/api/campus-stats").catch(() => null);
         const usersJson = usersRes?.ok ? await usersRes.json().catch(() => ({})) : {};
-        
+
         const flagsRes = await fetch("/api/moderation/flags?status=PENDING").catch(() => null);
         const flagsJson = flagsRes?.ok ? await flagsRes.json().catch(() => ({})) : {};
 
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
         const postsTodayRes = await fetch("/api/posts?today=true&limit=1").catch(() => null);
         const postsTodayJson = postsTodayRes?.ok ? await postsTodayRes.json().catch(() => ({})) : {};
 
-        const totalStudents = usersJson?.total ?? usersJson?.users?.length ?? 8432;
+        const totalStudents = usersJson?.totalStudents ?? usersJson?.total ?? 8432;
         const postsTodayCount = postsTodayJson?.pagination?.total ?? 0;
         const flaggedContent = Array.isArray(flagsJson?.flags) ? flagsJson.flags.length : 14;
         const openTickets = Array.isArray(ticketsJson?.tickets) ? ticketsJson.tickets.length : 42;

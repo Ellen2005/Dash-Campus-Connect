@@ -225,6 +225,25 @@ export default function SearchPage() {
           ))}
         </TabsContent>
 
+        <TabsContent value="events" className="pt-4 space-y-2">
+          {loading ? <LoadingState /> : events.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">No events found.</p>
+            </div>
+          ) : events.map((e, i) => (
+            <div key={e.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30 transition-colors animate-in fade-in duration-150" style={{ animationDelay: `${i * 30}ms` }}>
+              <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+                <Search className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{e.title}</p>
+                <p className="text-[11px] text-muted-foreground">{e.date ? new Date(e.date).toLocaleDateString() : ''}{e.location ? ` · ${e.location}` : ''}</p>
+              </div>
+            </div>
+          ))}
+        </TabsContent>
+
         <TabsContent value="communities" className="pt-4 space-y-2">
           {loading ? <LoadingState /> : communities.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">

@@ -62,10 +62,9 @@ export async function GET(request: NextRequest) {
         select: { following: { select: { followingId: true } } }
       });
       const followingIds = userWithFollowing?.following.map(f => f.followingId) || [];
-      // Also include user's own posts
       followingIds.push(userId);
       
-      if (!authorId) { // only apply if we aren't explicitly fetching a specific author
+      if (!authorId) {
         where.authorId = { in: followingIds };
       }
     }
@@ -97,6 +96,7 @@ export async function GET(request: NextRequest) {
         },
         comments: {
           take: 3,
+          orderBy: { createdAt: 'desc' },
           include: {
             author: {
               select: {
@@ -107,11 +107,16 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        likes: {
+        _count: {
           select: {
-            userId: true,
-            reaction: true,
+            likes: true,
+            comments: true,
           },
+        },
+        likes: {
+          where: currentUserId ? { userId: currentUserId } : { userId: undefined },
+          select: { userId: true, reaction: true },
+          take: 1,
         },
       },
     })

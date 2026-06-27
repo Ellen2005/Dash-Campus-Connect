@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,7 +41,7 @@ type CommentRow = {
   author: { id: string; name: string; username: string | null; profilePhoto: string | null };
 };
 
-export function PostCard({ id = "post", author, content, image, actionUrl, timestamp, score, comments, isAnnouncement, channel }: PostCardProps) {
+export const PostCard = memo(function PostCard({ id = "post", author, content, image, actionUrl, timestamp, score, comments, isAnnouncement, channel }: PostCardProps) {
   const { t } = useI18n();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -379,4 +379,4 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
       />
     </>
   );
-}
+});

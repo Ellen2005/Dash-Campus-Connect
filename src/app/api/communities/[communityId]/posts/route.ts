@@ -27,7 +27,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ com
 
   const { communityId } = await params;
   const body = await req.json().catch(() => null);
-  const parsed = z.object({ content: z.string().min(1).max(5000) }).safeParse(body);
+  const parsed = z.object({
+    content: z.string().min(1).max(5000),
+    images: z.array(z.string()).optional(),
+    attachmentUrl: z.string().optional(),
+    attachmentName: z.string().optional(),
+  }).safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid data." }, { status: 400 });
 
   // Verify membership
@@ -41,6 +46,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ com
       content: parsed.data.content,
       communityId,
       authorId: auth.userId,
+      images: parsed.data.images ?? [],
+      attachmentUrl: parsed.data.attachmentUrl,
+      attachmentName: parsed.data.attachmentName,
     },
     include: {
       author: { select: { id: true, name: true, username: true, profilePhoto: true } },
