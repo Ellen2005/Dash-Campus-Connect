@@ -16,10 +16,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:test": "node scripts/test-db-connection.js",
-    "db:direct-url": "node scripts/derive-direct-url.js",
-    "seed": "tsx prisma/seed.ts",
-    "demo:seed": "npx prisma db push && npx tsx prisma/seed.ts",
-    "demo": "cross-env DEMO_MODE=true RATE_LIMIT_MAX=9999 next dev --turbopack -p 9002"
+    "db:direct-url": "node scripts/derive-direct-url.js"
   },
   "dependencies": {
     "@genkit-ai/firebase": "^1.31.0",

@@ -247,6 +247,7 @@ model CommunityMember {
   
   @@unique([userId, communityId])
   @@index([communityId])
+  @@index([userId])
 }
 
 enum CommunityRole {
@@ -310,6 +311,7 @@ model CartItem {
   
   @@unique([cartId, listingId])
   @@index([cartId])
+  @@index([listingId])
 }
 
 model Order {
@@ -340,6 +342,7 @@ model OrderItem {
   pricePerUnit    Float
   
   @@index([orderId])
+  @@index([listingId])
 }
 
 enum OrderStatus {
@@ -540,6 +543,8 @@ model Post {
   @@index([authorId])
   @@index([createdAt])
   @@index([audience])
+  @@index([groupPostId])
+  @@index([audienceGroupId])
 }
 
 enum Audience {
@@ -603,6 +608,8 @@ model Mention {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([postId])
+  @@index([commentId])
 }
 
 // ============= Groups & Communities =============
@@ -654,6 +661,7 @@ model GroupMember {
 
   @@unique([userId, groupId])
   @@index([groupId])
+  @@index([userId])
 }
 
 enum GroupRole {
@@ -698,6 +706,8 @@ model ChatGroup {
   members   String[]  @default([]) // User IDs
   messages  Message[]
   createdAt DateTime  @default(now())
+
+  @@index([members], type: Gin)
 }
 
 // ============= Events =============
@@ -762,6 +772,7 @@ model EventAttendee {
 
   @@unique([userId, eventId])
   @@index([eventId])
+  @@index([userId])
 }
 
 enum RSVPStatus {
@@ -947,6 +958,7 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([userId, isRead, createdAt])
   @@index([createdAt])
 }
 
@@ -987,6 +999,7 @@ model LibraryResource {
   @@index([schoolId])
   @@index([type])
   @@index([createdAt])
+  @@index([uploadedById])
 }
 
 // ============= Analytics & Logging =============

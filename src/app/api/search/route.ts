@@ -86,8 +86,14 @@ export async function GET(request: NextRequest) {
         include: {
           fieldOfStudy: { select: { name: true } },
           level: { select: { name: true } },
-          followers: { select: { followerId: true, followingId: true } },
-          following: { select: { followerId: true, followingId: true } },
+          _count: { select: { followers: true, following: true } },
+          ...(currentUserId ? {
+            followers: {
+              where: { followerId: currentUserId },
+              select: { id: true },
+              take: 1,
+            },
+          } : {}),
         },
       }),
       prisma.group.findMany({
@@ -95,8 +101,14 @@ export async function GET(request: NextRequest) {
         take: 20,
         orderBy: { createdAt: "desc" },
         include: {
-          members: { select: { userId: true } },
           _count: { select: { members: true } },
+          ...(currentUserId ? {
+            members: {
+              where: { userId: currentUserId },
+              select: { id: true },
+              take: 1,
+            },
+          } : {}),
         },
       }),
       prisma.event.findMany({
@@ -129,9 +141,7 @@ export async function GET(request: NextRequest) {
 
     const normalizedUsers = users.map((user) => {
       const isCurrentUser = currentUserId && user.id === currentUserId;
-      const following = currentUserId
-        ? user.followers.some((follow) => follow.followerId === currentUserId)
-        : false;
+      const following = currentUserId ? user.followers.length > 0 : false;
 
       return {
         id: user.id,
@@ -139,7 +149,7 @@ export async function GET(request: NextRequest) {
         username: user.username,
         avatar: user.profilePhoto,
         faculty: [user.fieldOfStudy?.name, user.level?.name].filter(Boolean).join(" · "),
-        mutual: Math.min(user.followers.length, user.following.length),
+        mutual: Math.min(user._count.followers, user._count.following),
         status: isCurrentUser ? "connected" : following ? "connected" : "none",
       };
     });
@@ -150,7 +160,7 @@ export async function GET(request: NextRequest) {
       description: group.description,
       members: group._count.members,
       type: group.isPublic ? "public" : "private",
-      joined: currentUserId ? group.members.some((member) => member.userId === currentUserId) : false,
+      joined: currentUserId ? group.members.length > 0 : false,
     }));
 
     const normalizedEvents = events.map(event => ({

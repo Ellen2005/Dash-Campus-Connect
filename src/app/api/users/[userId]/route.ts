@@ -58,8 +58,12 @@ export async function GET(
           orderBy: { createdAt: 'desc' },
         },
         notificationPrefs: true,
-        followers: true,
-        following: true,
+        _count: {
+          select: {
+            followers: true,
+            following: true,
+          },
+        },
       },
     })
 
