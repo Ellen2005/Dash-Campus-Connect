@@ -1,6 +1,4 @@
 "use client";
-import '@/app/main/communities/[communityId]/CommunityDetail.module.css';
-
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -40,7 +38,7 @@ export default function CommunityDetailPage() {
     setLoading(true);
     try {
       const [cRes, pRes] = await Promise.all([
-        fetch(`/api/communities/${communityId}?userId=${dashUser?.id ?? ""}`, { cache: "no-store" }),
+        fetch(`/api/communities/${communityId}`, { cache: "no-store" }),
         fetch(`/api/communities/${communityId}/posts`, { cache: "no-store" }),
       ]);
       const cJson = await cRes.json().catch(() => ({}));
@@ -70,7 +68,7 @@ export default function CommunityDetailPage() {
       const res = await fetch(`/api/communities/${communityId}/posts`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: finalContent, authorId: dashUser.id }),
+        body: JSON.stringify({ content: finalContent }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Failed to post.");
@@ -87,12 +85,10 @@ export default function CommunityDetailPage() {
   };
 
   const handleJoinLeave = async () => {
-    if (!dashUser || !community) return;
+    if (!community) return;
     const endpoint = community.isMember ? "leave" : "join";
     const res = await fetch(`/api/communities/${communityId}/${endpoint}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: dashUser.id }),
     });
     if (res.ok) {
       setCommunity(prev => prev ? { ...prev, isMember: !prev.isMember } : prev);

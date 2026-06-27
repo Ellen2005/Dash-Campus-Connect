@@ -43,15 +43,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             id: e.id,
             title: e.title,
             description: e.description || "",
-            bannerImageUrl: e.qrCheckIn || "https://picsum.photos/seed/event-default/1200/600",
+            bannerImageUrl: e.bannerImage || "https://picsum.photos/seed/event-default/1200/600",
             startDate: e.date,
             locationName: e.location,
-            category: "Social",
+            category: e.category || "Social",
             organiserName: e.organizer?.name ?? "Organizer",
             organiserAvatar: e.organizer?.profilePhoto ?? "",
             attendeeCount: e._count?.attendees ?? 0,
             maxAttendees: e.capacity ?? 200,
           });
+          // Load current user's RSVP status
+          if (dashUser?.id && e.attendees) {
+            const myAttendee = e.attendees.find((a: any) => a.userId === dashUser.id);
+            if (myAttendee && (myAttendee.status === "GOING" || myAttendee.status === "MAYBE")) {
+              setRsvp(myAttendee.status === "GOING" ? "Going" : "Maybe");
+            }
+          }
         } else {
           toast({ title: "Event not found", variant: "destructive" });
         }
@@ -61,21 +68,30 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         setLoading(false);
       }
     }
-    loadEvent();
-  }, [id]);
+    if (dashUser) loadEvent();
+  }, [id, dashUser?.id]);
 
   const handleRSVP = async (status: "Going" | "Maybe") => {
     const next = rsvp === status ? null : status;
+    const prevState = rsvp;
     setRsvp(next);
-    if (!next) return;
     try {
-      await fetch(`/api/events/${id}/rsvp`, {
+      const res = await fetch(`/api/events/${id}/rsvp`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userId: dashUser?.id, status: next }),
+        body: JSON.stringify({ userId: dashUser?.id, status: next || "NOT_GOING" }),
       });
-    } catch {}
-    toast({ title: next ? `RSVP: ${next}` : "RSVP Cancelled" });
+      if (!res.ok) {
+        setRsvp(prevState);
+        const err = await res.json().catch(() => ({}));
+        toast({ title: err.error || "Failed to RSVP", variant: "destructive" });
+        return;
+      }
+      toast({ title: next ? `RSVP: ${next}` : "RSVP Cancelled" });
+    } catch {
+      setRsvp(prevState);
+      toast({ title: "Failed to RSVP", variant: "destructive" });
+    }
   };
 
   if (loading) {
@@ -145,7 +161,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-primary" />{event.locationName}</span>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              toast({ title: "Link copied to clipboard!" });
+            }}>
               <Share2 className="w-4 h-4" /> Share
             </Button>
           </div>

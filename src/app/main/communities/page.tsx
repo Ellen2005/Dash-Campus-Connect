@@ -33,10 +33,9 @@ export default function CommunitiesPage() {
   const [form, setForm] = useState({ name: "", description: "" });
 
   const load = async () => {
-    if (!dashUser?.schoolId) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/communities?schoolId=${dashUser.schoolId}&userId=${dashUser.id}`, { cache: "no-store" });
+      const res = await fetch(`/api/communities`, { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
       if (res.ok && Array.isArray(json?.communities)) setCommunities(json.communities);
     } finally {
@@ -44,14 +43,11 @@ export default function CommunitiesPage() {
     }
   };
 
-  useEffect(() => { void load(); }, [dashUser?.schoolId]);
+  useEffect(() => { void load(); }, []);
 
   const join = async (communityId: string) => {
-    if (!dashUser) return;
     const res = await fetch(`/api/communities/${communityId}/join`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: dashUser.id }),
     });
     if (res.ok) {
       setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: true, _count: { ...c._count, members: c._count.members + 1 } } : c));
@@ -63,11 +59,8 @@ export default function CommunitiesPage() {
   };
 
   const leave = async (communityId: string) => {
-    if (!dashUser) return;
     const res = await fetch(`/api/communities/${communityId}/leave`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: dashUser.id }),
     });
     if (res.ok) {
       setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: false, _count: { ...c._count, members: Math.max(0, c._count.members - 1) } } : c));
@@ -83,7 +76,7 @@ export default function CommunitiesPage() {
       const res = await fetch("/api/communities", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: form.name.trim(), description: form.description.trim() || undefined, schoolId: dashUser.schoolId, creatorId: dashUser.id }),
+        body: JSON.stringify({ name: form.name.trim(), description: form.description.trim() || undefined }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Failed to create community.");

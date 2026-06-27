@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
 
 const JOIN_REQUEST_TITLE = "GROUP_JOIN_REQUEST";
 const TOKEN_PREFIX = "JOIN_REQ::";
 
 const ActSchema = z.object({
-  ownerId: z.string(),
   groupId: z.string(),
   requesterId: z.string(),
   action: z.enum(["approve", "reject"]),
 });
 
 function parseJoinRequest(message: string) {
-  // Format: JOIN_REQ::<groupId>::<requesterId>::<groupName>
   if (!message.startsWith(TOKEN_PREFIX)) return null;
   const parts = message.split("::");
   if (parts.length < 4) return null;
@@ -25,15 +24,13 @@ function parseJoinRequest(message: string) {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const ownerId = (request.nextUrl.searchParams.get("ownerId") ?? "").trim();
-    if (!ownerId) {
-      return NextResponse.json({ error: "ownerId is required." }, { status: 400 });
-    }
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
 
+  try {
     const rows = await prisma.notification.findMany({
       where: {
-        userId: ownerId,
+        userId: auth.userId,
         type: "SYSTEM_ALERT",
         title: JOIN_REQUEST_TITLE,
         isRead: false,
@@ -68,13 +65,16 @@ export async function GET(request: NextRequest) {
         requester: userMap.get(r.requesterId) ?? null,
       })),
     });
-  } catch (e: any) {
-    const msg = (e?.message ?? "").toString();
-    return NextResponse.json({ error: `Failed to load join requests. ${msg}`.trim() }, { status: 500 });
+  } catch (e) {
+    console.error("Failed to load join requests:", e);
+    return NextResponse.json({ error: "Failed to load join requests." }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json();
     const parsed = ActSchema.parse(body);
@@ -84,14 +84,14 @@ export async function POST(request: NextRequest) {
       select: { id: true, creatorId: true },
     });
     if (!group) return NextResponse.json({ error: "Group not found." }, { status: 404 });
-    if (group.creatorId !== parsed.ownerId) {
+    if (group.creatorId !== auth.userId) {
       return NextResponse.json({ error: "Only the group owner can review requests." }, { status: 403 });
     }
 
     const token = `JOIN_REQ::${parsed.groupId}::${parsed.requesterId}`;
     const reqNotif = await prisma.notification.findFirst({
       where: {
-        userId: parsed.ownerId,
+        userId: auth.userId,
         type: "SYSTEM_ALERT",
         title: JOIN_REQUEST_TITLE,
         message: { contains: token },
@@ -124,7 +124,6 @@ export async function POST(request: NextRequest) {
       data: { isRead: true, readAt: new Date() },
     });
 
-    // Notify the requester
     const { createNotification } = await import("@/lib/notifications");
     await createNotification({
       userId: parsed.requesterId,
@@ -135,12 +134,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, action: parsed.action });
-  } catch (e: any) {
+  } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json({ error: e.errors }, { status: 400 });
     }
-    const msg = (e?.message ?? "").toString();
-    return NextResponse.json({ error: `Failed to process request. ${msg}`.trim() }, { status: 500 });
+    console.error("Failed to process request:", e);
+    return NextResponse.json({ error: "Failed to process request." }, { status: 500 });
   }
 }
-

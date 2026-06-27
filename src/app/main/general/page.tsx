@@ -137,7 +137,7 @@ export default function GeneralPage() {
     }
   };
 
-  const isAdmin = dashUser?.role === "ADMIN" || dashUser?.role === "SUPER_ADMIN";
+  const isAdmin = dashUser?.role === "admin" || dashUser?.role === "student_admin";
 
   return (
     <div className="space-y-6 pb-20 page-enter">

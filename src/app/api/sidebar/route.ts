@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
       where: postWhere,
       take: 80,
       orderBy: { createdAt: "desc" },
-      select: { content: true, likes: { select: { id: true } }, comments: { select: { id: true } } },
+      select: { content: true, _count: { select: { likes: true, comments: true } } },
     });
 
     const tagCounts = new Map<string, number>();
     for (const post of recentPosts) {
       const tags = post.content.match(/#[\w-]+/g) ?? [];
-      const engagement = post.likes.length + post.comments.length;
+      const engagement = post._count.likes + post._count.comments;
       for (const tag of tags) {
         const key = tag.toLowerCase();
         tagCounts.set(key, (tagCounts.get(key) ?? 0) + 1 + engagement);

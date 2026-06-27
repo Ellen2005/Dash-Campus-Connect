@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
+import { rateLimit, ipFromRequest } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
+  // Rate limit: 30 searches per IP per minute
+  const limiter = rateLimit(`search:${ipFromRequest(request)}`, 30, 60_000);
+  if (!limiter.allowed) return limiter.response;
+
   try {
+    // Authenticate to enforce school isolation
+    const auth = await requireUser();
+    if (auth.errorResponse) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    const currentUserId = auth.userId;
+    const currentUserSchoolId = auth.dbUser.schoolId;
+
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get("q") ?? "").trim();
-    const currentUserId = (searchParams.get("currentUserId") ?? "").trim();
     const scopeGroupId = (searchParams.get("scopeGroupId") ?? "").trim();
 
     if (scopeGroupId) {
@@ -26,8 +39,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // School isolation — only search within user's school
+    const schoolFilter = currentUserSchoolId ? { schoolId: currentUserSchoolId } : {};
+
     const userWhere: any = {
       approvalStatus: "APPROVED",
+      ...schoolFilter,
       ...(query
         ? {
             OR: [
@@ -39,17 +56,17 @@ export async function GET(request: NextRequest) {
         : {}),
     };
 
-    const groupWhere = query
-      ? {
-          OR: [
-            { name: { contains: query, mode: "insensitive" as const } },
-            { description: { contains: query, mode: "insensitive" as const } },
-          ],
-          ...(scopeGroupId ? { id: scopeGroupId } : {}),
-        }
-      : scopeGroupId
-        ? { id: scopeGroupId }
-        : {};
+    const groupWhere = {
+      ...(query
+        ? {
+            OR: [
+              { name: { contains: query, mode: "insensitive" as const } },
+              { description: { contains: query, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+      ...(scopeGroupId ? { id: scopeGroupId } : {}),
+    };
 
     const eventWhere = {
       approvalStatus: "APPROVED" as const,

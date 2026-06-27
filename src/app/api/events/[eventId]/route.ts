@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser } from '@/lib/require-user'
 
 
 export async function GET(
@@ -78,9 +79,21 @@ async function handleUpdate(
   request: NextRequest,
   paramsPromise: Promise<{ eventId: string }>
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { eventId } = await paramsPromise
     const body = await request.json()
+
+    const existing = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { organizerId: true },
+    });
+    if (!existing) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    if (existing.organizerId !== auth.userId && auth.dbUser.role !== 'ADMIN' && auth.dbUser.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Not authorized to update this event' }, { status: 403 });
+    }
 
     const event = await prisma.event.update({
       where: { id: eventId },
@@ -114,8 +127,20 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { eventId } = await params
+
+    const existing = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { organizerId: true },
+    });
+    if (!existing) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    if (existing.organizerId !== auth.userId && auth.dbUser.role !== 'ADMIN' && auth.dbUser.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Not authorized to delete this event' }, { status: 403 });
+    }
 
     await prisma.event.delete({
       where: { id: eventId },

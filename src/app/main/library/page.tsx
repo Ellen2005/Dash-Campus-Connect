@@ -105,7 +105,7 @@ export default function LibraryPage() {
       if (uploadFile_) {
         const { url, error } = await uploadFile(uploadFile_, "library", dashUser.id);
         if (error) throw new Error(error);
-        finalUrl = url;
+        if (url) finalUrl = url;
       }
 
       const res = await fetch("/api/library", {
@@ -246,12 +246,10 @@ export default function LibraryPage() {
                     {/* Action buttons */}
                     <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border">
                       {r.url && (
-                        <a href={r.url} target="_blank" rel="noopener noreferrer" className="flex-1">
-                          <Button size="sm" variant="outline" className="w-full h-7 text-[10px] gap-1">
-                            {r.type === "LINK" ? <ExternalLink className="w-3 h-3" /> : <Download className="w-3 h-3" />}
-                            {r.type === "LINK" ? "Open" : "Download"}
-                          </Button>
-                        </a>
+                        <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] gap-1" onClick={() => window.open(r.url, '_blank', 'noopener,noreferrer')}>
+                          {r.type === "LINK" ? <ExternalLink className="w-3 h-3" /> : <Download className="w-3 h-3" />}
+                          {r.type === "LINK" ? "Open" : "Download"}
+                        </Button>
                       )}
                       {r.content && (
                         <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" onClick={() => navigator.clipboard.writeText(r.content!)}>

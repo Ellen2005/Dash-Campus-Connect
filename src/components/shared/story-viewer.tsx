@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
@@ -28,18 +28,21 @@ export function StoryViewer({ stories, initialIndex, open, onClose }: StoryViewe
   const [itemIdx, setItemIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const story = stories[storyIdx];
   const item = story?.items[itemIdx];
   const totalItems = story?.items.length ?? 1;
 
   const goNext = useCallback(() => {
+    setImageError(false);
     if (itemIdx < totalItems - 1) { setItemIdx(i => i + 1); setProgress(0); }
     else if (storyIdx < stories.length - 1) { setStoryIdx(s => s + 1); setItemIdx(0); setProgress(0); }
     else { onClose(); }
   }, [itemIdx, totalItems, storyIdx, stories.length, onClose]);
 
   const goPrev = () => {
+    setImageError(false);
     if (itemIdx > 0) { setItemIdx(i => i - 1); setProgress(0); }
     else if (storyIdx > 0) { setStoryIdx(s => s - 1); setItemIdx(0); setProgress(0); }
   };
@@ -53,7 +56,7 @@ export function StoryViewer({ stories, initialIndex, open, onClose }: StoryViewe
   }, [open, paused, goNext, itemIdx, storyIdx]);
 
   useEffect(() => {
-    if (open) { setStoryIdx(initialIndex); setItemIdx(0); setProgress(0); }
+    if (open) { setStoryIdx(initialIndex); setItemIdx(0); setProgress(0); setImageError(false); }
   }, [open, initialIndex]);
 
   if (!story) return null;
@@ -90,10 +93,10 @@ export function StoryViewer({ stories, initialIndex, open, onClose }: StoryViewe
         <div className="flex-1 relative select-none"
           onMouseDown={() => setPaused(true)} onMouseUp={() => setPaused(false)}
           onTouchStart={() => setPaused(true)} onTouchEnd={() => setPaused(false)}>
-          {item?.type === "image" && item.src
-            ? <img src={item.src} alt="" className="w-full h-full object-cover" />
+          {item?.type === "image" && item.src && !imageError
+            ? <img src={item.src} alt="" className="w-full h-full object-cover" onError={() => setImageError(true)} />
             : <div className={cn("w-full h-full flex items-center justify-center p-8", item?.bg ?? "bg-gradient-to-br from-primary/80 to-primary/40")}>
-                <p className="text-white text-xl font-bold text-center">{item?.text}</p>
+                <p className="text-white text-xl font-bold text-center">{item?.text || "Unavailable"}</p>
               </div>
           }
           <button className="absolute left-0 top-0 w-1/3 h-full z-10" onClick={goPrev} />

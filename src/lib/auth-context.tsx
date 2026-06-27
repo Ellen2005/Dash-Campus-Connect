@@ -1,24 +1,36 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { User, Session } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState, ReactNode, useRef, useMemo } from "react";
+import type { User, Session, SupabaseClient } from "@supabase/supabase-js";
 
 import { createBrowserClient } from "@supabase/ssr";
 
-// Singleton — one client for the entire app lifetime
+// Lazy singleton — avoids module-level side effects for SSR safety
 let _supabase: SupabaseClient | null = null;
 function getSupabase(): SupabaseClient {
+  if (typeof window === "undefined") return null as unknown as SupabaseClient;
   if (!_supabase) {
     _supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookieOptions: {
+          name: "sb-dash",
+          maxAge: 60 * 60 * 24, // 24 hours
+        },
+      }
     );
   }
   return _supabase;
 }
 
-export const supabase = getSupabase();
+// Proxy object — allows module-level export for backward compat but defers creation
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    const client = getSupabase();
+    return Reflect.get(client, prop);
+  },
+});
 
 export function toSyntheticEmail(studentId: string, schoolId: string): string {
   const cleanId = studentId.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -125,15 +137,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data: userData, error: userError } = await client.auth.getUser();
-      if (!userError) {
+      try {
+        const { data: userData } = await client.auth.getUser();
         syncFromUser(userData.user ?? currentSession.user ?? null);
         lastMetadataRefreshAt.current = now;
         return;
+      } catch {
+        syncFromUser(currentSession.user ?? null);
+        lastMetadataRefreshAt.current = now;
       }
-
-      syncFromUser(currentSession.user ?? null);
-      lastMetadataRefreshAt.current = now;
     } finally {
       refreshInFlight.current = false;
     }
@@ -178,10 +190,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    // Session keepalive — prevents session expiry during long demos (4+ hours)
+    const keepalive = setInterval(refresh, 5 * 60 * 1000);
+
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      clearInterval(keepalive);
     };
   }, [session]);
 

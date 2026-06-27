@@ -32,6 +32,7 @@ export function StorySection() {
 
   // Viewing state
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [storyImageError, setStoryImageError] = useState(false);
 
   // Creation state
   const [createOpen, setCreateOpen] = useState(false);
@@ -139,7 +140,7 @@ export function StorySection() {
             <div className="relative w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500">
               <div className="w-full h-full bg-background rounded-full p-[2px]">
                 <Avatar className="w-full h-full">
-                  <AvatarImage src={story.author?.profilePhoto || ""} className="object-cover" />
+                  <AvatarImage src={story.author?.profilePhoto ?? undefined} className="object-cover" />
                   <AvatarFallback className="bg-primary/10 text-primary">
                     {(story.author?.name || "U")[0]}
                   </AvatarFallback>
@@ -167,7 +168,7 @@ export function StorySection() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Avatar className="w-8 h-8 border border-white/20">
-                      <AvatarImage src={activeStory.author?.profilePhoto || ""} className="object-cover" />
+                      <AvatarImage src={activeStory.author?.profilePhoto ?? undefined} className="object-cover" />
                       <AvatarFallback className="bg-primary/20 text-primary text-xs">
                         {(activeStory.author?.name || "U")[0]}
                       </AvatarFallback>
@@ -175,31 +176,36 @@ export function StorySection() {
                     <span className="font-semibold text-sm drop-shadow-md">{activeStory.author?.username}</span>
                     <span className="text-xs text-white/70 drop-shadow-md">{new Date(activeStory.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => setActiveStoryIndex(null)}>
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => { setActiveStoryIndex(null); setStoryImageError(false); }}>
                     <X className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
 
               {/* Story Content */}
-              {activeStory.mediaUrl ? (
-                <img src={activeStory.mediaUrl} alt="Story" className="w-full h-full object-contain" />
+              {activeStory.mediaUrl && !storyImageError ? (
+                <img
+                  src={activeStory.mediaUrl}
+                  alt="Story"
+                  className="w-full h-full object-contain"
+                  onError={() => setStoryImageError(true)}
+                />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-indigo-500 to-purple-600">
-                  <p className="text-center text-xl font-medium">{activeStory.caption}</p>
+                  <p className="text-center text-xl font-medium">{activeStory.caption || "Story unavailable"}</p>
                 </div>
               )}
 
               {/* Caption Overlay */}
-              {activeStory.mediaUrl && activeStory.caption && (
+              {activeStory.mediaUrl && activeStory.caption && !storyImageError && (
                 <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
                   <p className="text-sm drop-shadow-md">{activeStory.caption}</p>
                 </div>
               )}
 
               {/* Navigation Areas */}
-              <div className="absolute top-0 bottom-0 left-0 w-1/3 z-0 cursor-pointer" onClick={() => setActiveStoryIndex(prev => (prev !== null && prev > 0) ? prev - 1 : prev)} />
-              <div className="absolute top-0 bottom-0 right-0 w-1/3 z-0 cursor-pointer" onClick={() => setActiveStoryIndex(prev => (prev !== null && prev < stories.length - 1) ? prev + 1 : prev)} />
+              <div className="absolute top-0 bottom-0 left-0 w-1/3 z-0 cursor-pointer" onClick={() => { setActiveStoryIndex(prev => (prev !== null && prev > 0) ? prev - 1 : prev); setStoryImageError(false); }} />
+              <div className="absolute top-0 bottom-0 right-0 w-1/3 z-0 cursor-pointer" onClick={() => { setActiveStoryIndex(prev => (prev !== null && prev < stories.length - 1) ? prev + 1 : prev); setStoryImageError(false); }} />
             </div>
           )}
         </DialogContent>

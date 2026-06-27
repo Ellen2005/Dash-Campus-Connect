@@ -28,7 +28,7 @@ export default function AdminChatPage() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = dashUser?.role === "ADMIN" || dashUser?.role === "SUPER_ADMIN";
+  const isAdmin = dashUser?.role === "admin" || dashUser?.role === "student_admin";
   const isStudentAdmin = dashUser?.isStudentAdmin;
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { requireUser } from "@/lib/require-user";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ communityId: string }> }) {
   const { communityId } = await params;
@@ -12,35 +13,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ comm
     orderBy: { createdAt: "desc" },
     skip: (page - 1) * limit,
     take: limit,
+    include: {
+      author: { select: { id: true, name: true, username: true, profilePhoto: true } },
+    },
   });
 
   return NextResponse.json({ posts });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ communityId: string }> }) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   const { communityId } = await params;
   const body = await req.json().catch(() => null);
-  // Note: authorId is accepted but not stored (CommunityPost model doesn't have authorId field)
-  const parsed = z.object({ content: z.string().min(1).max(5000), authorId: z.string().min(1).optional() }).safeParse(body);
+  const parsed = z.object({ content: z.string().min(1).max(5000) }).safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid data." }, { status: 400 });
 
-  // Verify membership if authorId is provided
-  if (parsed.data.authorId) {
-    const member = await prisma.communityMember.findUnique({
-      where: { userId_communityId: { userId: parsed.data.authorId, communityId } },
-    });
-    if (!member) return NextResponse.json({ error: "You must be a member to post." }, { status: 403 });
-  }
-
-  if (!parsed.data.authorId) {
-    return NextResponse.json({ error: "authorId is required." }, { status: 400 });
-  }
+  // Verify membership
+  const member = await prisma.communityMember.findUnique({
+    where: { userId_communityId: { userId: auth.userId, communityId } },
+  });
+  if (!member) return NextResponse.json({ error: "You must be a member to post." }, { status: 403 });
 
   const post = await prisma.communityPost.create({
     data: {
       content: parsed.data.content,
       communityId,
-      authorId: parsed.data.authorId,
+      authorId: auth.userId,
     },
     include: {
       author: { select: { id: true, name: true, username: true, profilePhoto: true } },

@@ -97,7 +97,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticketI
         content: replyContent,
         createdAt: new Date().toISOString(),
         isAdmin: false, // Student replying
-        sender: { id: user?.id || "", name: user?.name || "Me" }
+        sender: { id: user?.id || "", name: user?.user_metadata?.full_name as string || "Me" }
       }]);
       setReplyContent("");
       
@@ -154,7 +154,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ ticketI
                   </div>
                 ) : (
                   <>
-                    <AvatarImage src={msg.sender?.profilePhoto || ""} />
+                    <AvatarImage src={msg.sender?.profilePhoto ?? undefined} />
                     <AvatarFallback>{msg.sender?.name?.[0]}</AvatarFallback>
                   </>
                 )}

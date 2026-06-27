@@ -67,7 +67,7 @@ export function CreatePostDialog() {
           setLoading(false);
           return;
         }
-        imageUrl = url;
+        imageUrl = url ?? null;
       }
 
       const res = await fetch("/api/posts", {

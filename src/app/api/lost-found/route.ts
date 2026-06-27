@@ -1,5 +1,16 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser } from '@/lib/require-user'
+import { z } from 'zod'
+
+const CreateSchema = z.object({
+  type: z.enum(['LOST', 'FOUND']).default('LOST'),
+  title: z.string().min(1).max(200),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  category: z.string().default('Other'),
+  photoUrl: z.string().optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,24 +51,30 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json()
-    const { type, title, description, location, category, photoUrl, posterId, schoolId } = body
+    const parsed = CreateSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 })
+    }
 
-    if (!title || !posterId) {
-      return NextResponse.json({ error: 'Title and posterId are required' }, { status: 400 })
+    if (!auth.dbUser.schoolId) {
+      return NextResponse.json({ error: 'No school assigned to your account.' }, { status: 400 })
     }
 
     const item = await prisma.lostFoundItem.create({
       data: {
-        type: type?.toUpperCase() === 'FOUND' ? 'FOUND' : 'LOST',
-        title,
-        description,
-        location,
-        category: category || 'Other',
-        photoUrl,
-        posterId,
-        schoolId,
+        type: parsed.data.type,
+        title: parsed.data.title,
+        description: parsed.data.description,
+        location: parsed.data.location,
+        category: parsed.data.category,
+        photoUrl: parsed.data.photoUrl,
+        posterId: auth.userId,
+        schoolId: auth.dbUser.schoolId,
       },
       include: {
         poster: {

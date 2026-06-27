@@ -27,6 +27,8 @@ export function ServerSidebar() {
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
 
   useEffect(() => {
     async function fetchCommunities() {
@@ -35,7 +37,6 @@ export function ServerSidebar() {
         const res = await fetch(`/api/communities?schoolId=${dashUser.schoolId}&userId=${dashUser.id}`);
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
-        // Filter to only communities the user is a member of
         const userComms = (data.communities || []).filter((c: Community) => c.isMember);
         setCommunities(userComms);
       } catch (e) {
@@ -46,6 +47,27 @@ export function ServerSidebar() {
     }
     fetchCommunities();
   }, [dashUser]);
+
+  useEffect(() => {
+    if (!dashUser?.id) return;
+    async function fetchUnread() {
+      try {
+        const [notifRes, msgRes] = await Promise.all([
+          fetch("/api/notifications/unread", { cache: "no-store" }),
+          fetch("/api/messages/unread", { cache: "no-store" }),
+        ]);
+        if (notifRes.ok) setUnreadNotifCount((await notifRes.json()).count ?? 0);
+        if (msgRes.ok) setUnreadMsgCount((await msgRes.json()).count ?? 0);
+      } catch {}
+    }
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30_000);
+    window.addEventListener("focus", fetchUnread);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", fetchUnread);
+    };
+  }, [dashUser?.id]);
 
   return (
     <div className="w-[64px] hidden md:flex flex-col items-center py-3 gap-1 sidebar-bg border-r h-full">
@@ -101,9 +123,9 @@ export function ServerSidebar() {
 
       {/* Bottom actions */}
       <div className="flex flex-col items-center gap-1">
-        <SidebarIconBtn href="/main/notifications" icon={Bell}    label={t("notifications")} pathname={pathname} />
-        <SidebarIconBtn href="/main/messages"      icon={MessageCircle} label={t("messages")} pathname={pathname} />
-        <SidebarIconBtn href="/main/search"        icon={Search}   label={t("search")} pathname={pathname} />
+        <SidebarIconBtn href="/main/notifications" icon={Bell} label={t("notifications")} pathname={pathname} badge={unreadNotifCount > 0} />
+        <SidebarIconBtn href="/main/messages" icon={MessageCircle} label={t("messages")} pathname={pathname} badge={unreadMsgCount > 0} />
+        <SidebarIconBtn href="/main/search" icon={Search} label={t("search")} pathname={pathname} />
         <SidebarIconBtn href="/main/support" icon={LifeBuoy} label={t("support")} pathname={pathname} />
         {canAccessAdmin && (
           <SidebarIconBtn href="/main/admin" icon={Shield} label={t("admin")} pathname={pathname} danger />
@@ -124,14 +146,14 @@ function ActivePill({ show }: { show: boolean }) {
 }
 
 function SidebarIconBtn({
-  href, icon: Icon, label, pathname, danger
+  href, icon: Icon, label, pathname, danger, badge
 }: {
-  href: string; icon: React.ElementType; label: string; pathname: string; danger?: boolean;
+  href: string; icon: React.ElementType; label: string; pathname: string; danger?: boolean; badge?: boolean;
 }) {
   const isActive = pathname.startsWith(href);
   return (
     <Link href={href} title={label} className={cn(
-      "w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200",
+      "w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 relative",
       isActive
         ? danger
           ? "rounded-xl bg-destructive/15 text-destructive border border-destructive/30"
@@ -141,6 +163,7 @@ function SidebarIconBtn({
           : "text-muted-foreground hover:rounded-xl hover:bg-primary/10 hover:text-primary"
     )}>
       <Icon className="w-[18px] h-[18px]" />
+      {badge && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-destructive border-2 border-sidebar-bg" />}
     </Link>
   );
 }

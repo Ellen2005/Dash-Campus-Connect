@@ -6,43 +6,33 @@ import { z } from "zod";
 const CreateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  schoolId: z.string().min(1),
-  creatorId: z.string().min(1),
 });
 
 export async function GET(req: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
+  if (!auth.dbUser.schoolId) {
+    return NextResponse.json({ error: "No school assigned to your account." }, { status: 400 });
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get("schoolId");
-    const userId = searchParams.get("userId");
-
-    // Try cookie auth first, fall back to query params for backward compatibility
-    let resolvedSchoolId = schoolId;
-    let resolvedUserId = userId;
-    
-    if (!resolvedSchoolId || !resolvedUserId) {
-      const result = await requireUser();
-      if (!result.errorResponse && result.dbUser) {
-        resolvedSchoolId = resolvedSchoolId ?? result.dbUser.schoolId;
-        resolvedUserId = resolvedUserId ?? result.userId;
-      }
-    }
-
-    if (!resolvedSchoolId) return NextResponse.json({ error: "schoolId required." }, { status: 400 });
+    const resolvedSchoolId = auth.dbUser.schoolId;
+    const resolvedUserId = auth.userId;
 
     const communities = await prisma.community.findMany({
       where: { schoolId: resolvedSchoolId },
       orderBy: { createdAt: "desc" },
       include: {
         _count: { select: { members: true, posts: true } },
-        members: resolvedUserId ? { where: { userId: resolvedUserId }, select: { id: true } } : false,
+        members: { where: { userId: resolvedUserId }, select: { id: true } },
       },
     });
 
     return NextResponse.json({
       communities: communities.map(c => ({
         ...c,
-        isMember: resolvedUserId ? c.members.length > 0 : false,
+        isMember: c.members.length > 0,
         members: undefined,
       })),
     });
@@ -53,26 +43,30 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { user, errorResponse } = await requireUser();
-  if (errorResponse) return errorResponse;
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
 
   const body = await req.json().catch(() => null);
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid data." }, { status: 400 });
 
+  if (!auth.dbUser.schoolId) {
+    return NextResponse.json({ error: "No school assigned to your account." }, { status: 400 });
+  }
+
   const community = await prisma.community.create({
     data: {
       name: parsed.data.name,
       description: parsed.data.description,
-      schoolId: parsed.data.schoolId,
-      creatorId: parsed.data.creatorId,
+      schoolId: auth.dbUser.schoolId,
+      creatorId: auth.userId,
       type: "STUDENT_CREATED",
     },
   });
 
   // Auto-join creator
   await prisma.communityMember.create({
-    data: { userId: parsed.data.creatorId, communityId: community.id, role: "OWNER" },
+    data: { userId: auth.userId, communityId: community.id, role: "OWNER" },
   });
 
   return NextResponse.json({ community }, { status: 201 });

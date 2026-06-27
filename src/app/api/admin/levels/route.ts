@@ -1,10 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminSession } from "@/lib/require-admin";
 
 export async function GET(request: NextRequest) {
+  const { session, errorResponse } = await requireAdminSession();
+  if (errorResponse) return errorResponse;
+
   const { searchParams } = new URL(request.url);
-  const schoolId = searchParams.get("schoolId");
-  
+  const schoolId = searchParams.get("schoolId") || session.admin.school.id;
+
   if (!schoolId) return NextResponse.json({ error: "schoolId required" }, { status: 400 });
 
   try {
@@ -21,16 +25,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { session, errorResponse } = await requireAdminSession();
+  if (errorResponse) return errorResponse;
+
   try {
     const body = await request.json();
-    const { name, description, order, schoolId } = body;
+    const { name, description, order } = body;
     
-    if (!name || !schoolId) {
-      return NextResponse.json({ error: "Name and schoolId required" }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ error: "Name required" }, { status: 400 });
     }
 
     const level = await prisma.level.create({
-      data: { name, description, order: order || 0, schoolId },
+      data: { name, description, order: order || 0, schoolId: session.admin.school.id },
     });
     return NextResponse.json({ level }, { status: 201 });
   } catch (error: any) {
@@ -43,6 +50,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const { session, errorResponse } = await requireAdminSession();
+  if (errorResponse) return errorResponse;
+
   try {
     const body = await request.json();
     const { id, name, description, order } = body;
@@ -51,11 +61,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "id and name required" }, { status: 400 });
     }
 
-    const level = await prisma.level.update({
+    const level = await prisma.level.findUnique({ where: { id }, select: { schoolId: true } });
+    if (!level || level.schoolId !== session.admin.school.id) {
+      return NextResponse.json({ error: "Level not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.level.update({
       where: { id },
       data: { name, description, order },
     });
-    return NextResponse.json({ level });
+    return NextResponse.json({ level: updated });
   } catch (error) {
     console.error("Error updating level:", error);
     return NextResponse.json({ error: "Failed to update level" }, { status: 500 });
@@ -63,12 +78,20 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const { session, errorResponse } = await requireAdminSession();
+  if (errorResponse) return errorResponse;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   try {
+    const level = await prisma.level.findUnique({ where: { id }, select: { schoolId: true } });
+    if (!level || level.schoolId !== session.admin.school.id) {
+      return NextResponse.json({ error: "Level not found" }, { status: 404 });
+    }
+
     await prisma.level.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {

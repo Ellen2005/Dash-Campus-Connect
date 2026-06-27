@@ -108,7 +108,7 @@ export function LibraryTab({ schoolId }: { schoolId?: string }) {
 
         const { url, error } = await uploadFile(uploadFile_, "library", dashUser.id);
         if (error) throw new Error(error);
-        finalUrl = url;
+        if (url) finalUrl = url;
       }
 
       const res = await fetch("/api/library", {

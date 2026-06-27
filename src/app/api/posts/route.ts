@@ -141,6 +141,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { content, images, video, location, audience, groupPostId } = CreatePostSchema.parse(body)
 
+    // Validate group membership if posting to a group
+    if (groupPostId) {
+      const membership = await prisma.groupMember.findUnique({
+        where: { userId_groupId: { userId: user.userId, groupId: groupPostId } },
+      });
+      if (!membership) {
+        return NextResponse.json({ error: "You must be a member of this group to post." }, { status: 403 });
+      }
+    }
+
     const post = await prisma.post.create({
       data: {
         content,

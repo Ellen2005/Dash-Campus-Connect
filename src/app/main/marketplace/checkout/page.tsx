@@ -55,7 +55,7 @@ export default function CheckoutPage() {
   }, [dashUser?.id, searchParams]);
 
   const subtotal = cartItems.reduce((sum: number, item: any) => sum + (item.price || 0), 0);
-  const platformFee = subtotal > 0 ? 500 : 0;
+  const platformFee = subtotal > 0 ? Math.round(subtotal * 0.05) : 0;
   const total = subtotal + platformFee;
 
   const removeFromCart = async (item: any) => {

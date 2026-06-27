@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { requireUser } from "@/lib/require-user";
 
 const CreateOrderSchema = z.object({
-  buyerId: z.string().min(1),
   paymentMethod: z.enum(["MOBILE_MONEY", "ORANGE_MONEY"]).default("MOBILE_MONEY"),
   phoneNumber: z.string().optional(),
   totalPrice: z.number().min(0).optional(),
@@ -15,21 +15,16 @@ const CreateOrderSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   const { searchParams } = new URL(req.url);
-  const buyerId = searchParams.get("buyerId");
   const sellerId = searchParams.get("sellerId");
   const status = searchParams.get("status");
 
-  if (!buyerId && !sellerId) {
-    return NextResponse.json({ error: "buyerId or sellerId required." }, { status: 400 });
-  }
+  let where: Record<string, unknown> = {};
 
-  let where: any = {};
-
-  if (buyerId) where.buyerId = buyerId;
-  if (status) where.status = status;
-
-  // If sellerId, find orders that contain listings owned by this seller
+  // Users see their own orders; sellers see orders for their listings
   if (sellerId) {
     const listingIds = await prisma.marketplaceListing.findMany({
       where: { sellerId },
@@ -40,7 +35,11 @@ export async function GET(req: NextRequest) {
         listingId: { in: listingIds.map(l => l.id) },
       },
     };
+  } else {
+    where.buyerId = auth.userId;
   }
+
+  if (status) where.status = status;
 
   const orders = await prisma.order.findMany({
     where,
@@ -59,16 +58,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   const body = await req.json().catch(() => null);
   const parsed = CreateOrderSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid data." }, { status: 400 });
 
-  const { buyerId, paymentMethod, items } = parsed.data;
+  const { paymentMethod, items } = parsed.data;
   const totalPrice = items.reduce((sum, i) => sum + i.pricePerUnit * i.quantity, 0);
 
   const order = await prisma.order.create({
     data: {
-      buyerId,
+      buyerId: auth.userId,
       totalPrice,
       paymentMethod,
       status: "PENDING",
@@ -78,8 +80,7 @@ export async function POST(req: NextRequest) {
     include: { items: true },
   });
 
-  // Clear cart after order
-  const cart = await prisma.shoppingCart.findUnique({ where: { userId: buyerId } });
+  const cart = await prisma.shoppingCart.findUnique({ where: { userId: auth.userId } });
   if (cart) {
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   }

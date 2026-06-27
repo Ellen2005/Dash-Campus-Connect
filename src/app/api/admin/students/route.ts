@@ -18,7 +18,7 @@ type ApiResponse<T = any> = {
   error?: string;
 };
 
-export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse>> {
+export async function GET(req: NextRequest) {
   try {
     const { session, errorResponse } = await requireAdminSession();
     if (errorResponse) return errorResponse;

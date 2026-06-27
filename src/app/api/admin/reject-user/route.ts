@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/require-admin";
+import { prisma } from "@/lib/prisma";
 
 const BodySchema = z.object({
   userId: z.string().min(1),
@@ -44,6 +45,20 @@ export async function POST(request: NextRequest) {
   const userSchoolId = (currentMeta.school_id ?? "").toString().trim().toLowerCase();
   if (userSchoolId !== session.admin.schoolId.trim().toLowerCase()) {
     return NextResponse.json({ error: "You can only reject users for your school." }, { status: 403 });
+  }
+
+  // First clean up Prisma user data (community memberships, follows, etc.)
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.communityMember.deleteMany({ where: { userId } });
+      await tx.follow.deleteMany({ where: { OR: [{ followerId: userId }, { followingId: userId }] } });
+      await tx.like.deleteMany({ where: { userId } });
+      await tx.comment.deleteMany({ where: { authorId: userId } });
+      await tx.post.deleteMany({ where: { authorId: userId } });
+      await tx.user.delete({ where: { id: userId } });
+    });
+  } catch (e) {
+    console.error("[reject-user] Failed to clean up Prisma records:", e);
   }
 
   const { error } = await supabase.auth.admin.deleteUser(userId);

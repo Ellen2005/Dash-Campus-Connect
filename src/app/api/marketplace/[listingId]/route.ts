@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser } from '@/lib/require-user'
 
 
 export async function GET(
@@ -46,7 +47,6 @@ export async function GET(
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
     }
 
-    // Calculate average rating
     const averageRating = listing.reviews.length > 0
       ? listing.reviews.reduce((sum, review) => sum + review.rating, 0) / listing.reviews.length
       : null
@@ -65,13 +65,31 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ listingId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { listingId } = await params
+
+    const existing = await prisma.marketplaceListing.findUnique({
+      where: { id: listingId },
+      select: { sellerId: true },
+    })
+    if (!existing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+    if (existing.sellerId !== auth.userId && auth.dbUser.role !== 'ADMIN' && auth.dbUser.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    }
+
     const body = await request.json()
+    const allowedFields = ['title', 'description', 'price', 'isFree', 'isTradeOnly', 'images', 'condition', 'category', 'preferredContact', 'expiresAt']
+    const updateData: Record<string, unknown> = {}
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) updateData[field] = body[field]
+    }
 
     const listing = await prisma.marketplaceListing.update({
       where: { id: listingId },
-      data: body,
+      data: updateData,
       include: {
         seller: {
           select: {
@@ -94,8 +112,20 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ listingId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { listingId } = await params
+
+    const existing = await prisma.marketplaceListing.findUnique({
+      where: { id: listingId },
+      select: { sellerId: true },
+    })
+    if (!existing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+    if (existing.sellerId !== auth.userId && auth.dbUser.role !== 'ADMIN' && auth.dbUser.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    }
 
     await prisma.marketplaceListing.update({
       where: { id: listingId },

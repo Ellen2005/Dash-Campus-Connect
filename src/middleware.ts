@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const RATE_LIMIT_MAP = new Map<string, { count: number; resetAt: number }>();
-const MAX_REQUESTS = parseInt(process.env.RATE_LIMIT_MAX ?? "60");
-const WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? "60000");
+const MAX_RATE_LIMIT_MAP_SIZE = 100000;
+const IS_DEMO = process.env.DEMO_MODE === "true";
+const MAX_REQUESTS = IS_DEMO ? 9999 : parseInt(process.env.RATE_LIMIT_MAX ?? "60");
+const WINDOW_MS = IS_DEMO ? 60000 : parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? "60000");
 
 const BLOCKED_UA_PATTERNS = [
   /sqlmap/i, /nikto/i, /nmap/i, /masscan/i, /zgrab/i,
@@ -47,7 +49,7 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   return response;
 }
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const ip = getClientIp(request);
 

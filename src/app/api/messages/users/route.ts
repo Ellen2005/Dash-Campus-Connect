@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const q = (request.nextUrl.searchParams.get("q") ?? "").trim();
-    const currentUserId = (request.nextUrl.searchParams.get("currentUserId") ?? "").trim();
-    if (!currentUserId) {
-      return NextResponse.json({ error: "currentUserId is required." }, { status: 400 });
-    }
 
     const users = await prisma.user.findMany({
       where: {
-        id: { not: currentUserId },
+        id: { not: auth.userId },
         ...(q
           ? {
               OR: [
@@ -34,9 +34,8 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ users }, { status: 200 });
-  } catch (e: any) {
-    const msg = (e?.message ?? "").toString();
-    return NextResponse.json({ error: `Failed to search users. ${msg}`.trim() }, { status: 500 });
+  } catch (e) {
+    console.error("Failed to search users:", e);
+    return NextResponse.json({ error: "Failed to search users." }, { status: 500 });
   }
 }
-

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser } from '@/lib/require-user'
 
 
 export async function GET(
@@ -114,13 +115,32 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { groupId } = await params
-    const body = await request.json()
 
-    const group = await prisma.group.update({
+    const group = await prisma.group.findUnique({
       where: { id: groupId },
-      data: body,
+      select: { creatorId: true },
+    })
+
+    if (!group) return NextResponse.json({ error: 'Group not found' }, { status: 404 })
+    if (group.creatorId !== auth.userId && auth.dbUser.role !== 'ADMIN' && auth.dbUser.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Not authorized to update this group' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const allowedFields = ['name', 'description', 'photo', 'isPublic']
+    const updateData: Record<string, unknown> = {}
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) updateData[field] = body[field]
+    }
+
+    const updated = await prisma.group.update({
+      where: { id: groupId },
+      data: updateData,
       include: {
         creator: {
           select: {
@@ -132,7 +152,7 @@ export async function PATCH(
       },
     })
 
-    return NextResponse.json(group)
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('Error updating group:', error)
     return NextResponse.json({ error: 'Failed to update group' }, { status: 500 })
@@ -143,8 +163,21 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { groupId } = await params
+
+    const group = await prisma.group.findUnique({
+      where: { id: groupId },
+      select: { creatorId: true },
+    })
+
+    if (!group) return NextResponse.json({ error: 'Group not found' }, { status: 404 })
+    if (group.creatorId !== auth.userId && auth.dbUser.role !== 'ADMIN' && auth.dbUser.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Not authorized to delete this group' }, { status: 403 })
+    }
 
     await prisma.group.delete({
       where: { id: groupId },

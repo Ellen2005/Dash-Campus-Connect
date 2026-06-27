@@ -46,6 +46,7 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
   const { user } = useAuth();
   const { toast } = useToast();
   const [vote, setVote] = useState<"up" | "down" | "none">("none");
+  const [voteLoading, setVoteLoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -60,7 +61,7 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
   const [reportOpen, setReportOpen] = useState(false);
 
   const loadComments = useCallback(async () => {
-    if (!id || id === "post") return;
+    if (!id || id === "post" || id.startsWith("an-")) return;
     setLoadingComments(true);
     try {
       const res = await fetch(`/api/posts/${id}/comments?limit=30`);
@@ -81,7 +82,7 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
   }, [showComments, loadComments]);
 
   const submitComment = async () => {
-    if (!newComment.trim() || !user?.id || !id || id === "post") return;
+    if (!newComment.trim() || !user?.id || !id || id === "post" || id.startsWith("an-")) return;
     setSubmittingComment(true);
     try {
       const res = await fetch(`/api/posts/${id}/comments`, {
@@ -249,8 +250,17 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
           {/* Vote — upvote/downvote explained: arrows let you rank post quality */}
           <div className="flex items-center gap-0.5 bg-muted/40 rounded-full px-1 py-0.5 border border-border/50" title={`${t("upvote")} / ${t("downvote")}`}>
             <button
-              onClick={() => setVote(v => v === "up" ? "none" : "up")}
+              onClick={async () => {
+                const newVote = vote === "up" ? "none" : "up";
+                setVote(newVote);
+                if (id && id !== "post" && user?.id) {
+                  setVoteLoading(true);
+                  try { await fetch(`/api/posts/${id}/like`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reaction: newVote === "up" ? "👍" : "👎" }) }); } catch {}
+                  setVoteLoading(false);
+                }
+              }}
               title={t("upvote")}
+              disabled={voteLoading}
               className={cn("w-7 h-7 rounded-full flex items-center justify-center transition-all duration-150",
                 vote === "up" ? "bg-primary/15 text-primary scale-110" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
@@ -263,8 +273,17 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
               {currentScore}
             </span>
             <button
-              onClick={() => setVote(v => v === "down" ? "none" : "down")}
+              onClick={async () => {
+                const newVote = vote === "down" ? "none" : "down";
+                setVote(newVote);
+                if (id && id !== "post" && user?.id) {
+                  setVoteLoading(true);
+                  try { await fetch(`/api/posts/${id}/like`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reaction: "👎" }) }); } catch {}
+                  setVoteLoading(false);
+                }
+              }}
               title={t("downvote")}
+              disabled={voteLoading}
               className={cn("w-7 h-7 rounded-full flex items-center justify-center transition-all duration-150",
                 vote === "down" ? "bg-muted text-muted-foreground scale-110" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
@@ -273,56 +292,58 @@ export function PostCard({ id = "post", author, content, image, actionUrl, times
             </button>
           </div>
 
-          {/* Comments */}
-          <Collapsible open={showComments} onOpenChange={setShowComments}>
-            <CollapsibleTrigger asChild>
-              <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors" title={t("comment")}>
-                <MessageCircle className="w-4 h-4" />
-                <span className="font-semibold">{commentCount}</span>
-                <ChevronDown className={cn("w-3 h-3 transition-transform duration-150", showComments && "rotate-180")} />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3 space-y-3 pt-3 border-t border-border/50 animate-in fade-in duration-150">
-              <div className="flex gap-2">
-                <Avatar className="w-7 h-7 shrink-0">
-                  <AvatarFallback className="text-[10px] bg-primary/15 text-primary">U</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 flex gap-2">
-                  <Input
-                    value={newComment}
-                    onChange={e => setNewComment(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && newComment.trim() && !submittingComment) void submitComment(); }}
-                    placeholder={t("writeComment")}
-                    className="flex-1 h-8 text-xs bg-muted/40 border-border"
-                    disabled={!user}
-                  />
-                  <Button size="sm" className="h-8 px-2.5 bg-primary text-primary-foreground hover:opacity-90" disabled={!newComment.trim() || submittingComment || !user} onClick={() => void submitComment()}>
-                    <Send className="w-3.5 h-3.5" />
-                  </Button>
+          {/* Comments (hidden for announcements) */}
+          {!isAnnouncement && (
+            <Collapsible open={showComments} onOpenChange={setShowComments}>
+              <CollapsibleTrigger asChild>
+                <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors" title={t("comment")}>
+                  <MessageCircle className="w-4 h-4" />
+                  <span className="font-semibold">{commentCount}</span>
+                  <ChevronDown className={cn("w-3 h-3 transition-transform duration-150", showComments && "rotate-180")} />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3 space-y-3 pt-3 border-t border-border/50 animate-in fade-in duration-150">
+                <div className="flex gap-2">
+                  <Avatar className="w-7 h-7 shrink-0">
+                    <AvatarFallback className="text-[10px] bg-primary/15 text-primary">U</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 flex gap-2">
+                    <Input
+                      value={newComment}
+                      onChange={e => setNewComment(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && newComment.trim() && !submittingComment) void submitComment(); }}
+                      placeholder={t("writeComment")}
+                      className="flex-1 h-8 text-xs bg-muted/40 border-border"
+                      disabled={!user}
+                    />
+                    <Button size="sm" className="h-8 px-2.5 bg-primary text-primary-foreground hover:opacity-90" disabled={!newComment.trim() || submittingComment || !user} onClick={() => void submitComment()}>
+                      <Send className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              {loadingComments ? (
-                <p className="text-[11px] text-muted-foreground">Loading comments…</p>
-              ) : commentList.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">No comments yet. Be the first.</p>
-              ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {commentList.map((c) => (
-                    <div key={c.id} className="flex gap-2 text-xs">
-                      <Avatar className="w-6 h-6 shrink-0">
-                        <AvatarImage src={c.author.profilePhoto ?? undefined} />
-                        <AvatarFallback className="text-[9px] bg-primary/15 text-primary">{c.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="font-semibold">{c.author.name}</p>
-                        <p className="text-muted-foreground break-words">{c.content}</p>
+                {loadingComments ? (
+                  <p className="text-[11px] text-muted-foreground">Loading comments…</p>
+                ) : commentList.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">No comments yet. Be the first.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {commentList.map((c) => (
+                      <div key={c.id} className="flex gap-2 text-xs">
+                        <Avatar className="w-6 h-6 shrink-0">
+                          <AvatarImage src={c.author.profilePhoto ?? undefined} />
+                          <AvatarFallback className="text-[9px] bg-primary/15 text-primary">{c.author.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-semibold">{c.author.name}</p>
+                          <p className="text-muted-foreground break-words">{c.content}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
+                    ))}
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {/* Save indicator */}
           {saved && (

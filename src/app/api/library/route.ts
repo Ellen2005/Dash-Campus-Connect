@@ -1,10 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/require-user";
+import { z } from "zod";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get("schoolId");
+    const schoolId = searchParams.get("schoolId") || auth.dbUser.schoolId;
     const type = searchParams.get("type");
     const q = searchParams.get("q");
 
@@ -12,19 +17,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "schoolId required" }, { status: 400 });
     }
 
-    const where: any = { schoolId };
+    const where: Record<string, unknown> = { schoolId };
     if (type) where.type = type;
     if (q) {
       where.OR = [
         { title: { contains: q, mode: "insensitive" } },
         { description: { contains: q, mode: "insensitive" } },
       ];
-    }
-
-    // Check if libraryResource model exists in the schema
-    if (!prisma.libraryResource) {
-      console.warn("[library] libraryResource model not found in Prisma client, returning empty");
-      return NextResponse.json({ resources: [] });
     }
 
     const resources = await prisma.libraryResource.findMany({
@@ -45,28 +44,38 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+const CreateSchema = z.object({
+  title: z.string().min(1),
+  type: z.string().min(1),
+  description: z.string().optional(),
+  url: z.string().optional(),
+  content: z.string().optional(),
+});
+
+export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json();
-    const { title, type, description, url, content, schoolId, uploadedById } = body;
-
-    if (!title || !type || !schoolId || !uploadedById) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const parsed = CreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    if (!prisma.libraryResource) {
-      return NextResponse.json({ error: "Library feature not yet available in database" }, { status: 503 });
+    if (!auth.dbUser.schoolId) {
+      return NextResponse.json({ error: "No school assigned to your account." }, { status: 400 });
     }
 
     const resource = await prisma.libraryResource.create({
       data: {
-        title,
-        type,
-        description,
-        url,
-        content,
-        schoolId,
-        uploadedById,
+        title: parsed.data.title,
+        type: parsed.data.type,
+        description: parsed.data.description,
+        url: parsed.data.url,
+        content: parsed.data.content,
+        schoolId: auth.dbUser.schoolId,
+        uploadedById: auth.userId,
       },
       include: {
         uploadedBy: {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { requireUser } from "@/lib/require-user";
 
 const Schema = z.object({
   academicField: z.string().min(1),
@@ -7,6 +8,9 @@ const Schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json();
     const { academicField, interests } = Schema.parse(body);

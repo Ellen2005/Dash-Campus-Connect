@@ -2,13 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import type { MarketplaceCategory, Condition } from '@prisma/client'
+import { requireUser } from '@/lib/require-user';
 
 
 
 const CreateListingSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().min(1).max(2000),
-  sellerId: z.string(),
   category: z.enum(['TEXTBOOKS', 'ELECTRONICS', 'FURNITURE', 'HOUSING', 'SERVICES', 'TICKETS', 'OTHER']),
   condition: z.enum(['NEW', 'LIKE_NEW', 'GOOD', 'FAIR']),
   price: z.number().positive().optional(),
@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '12')
     const skip = (page - 1) * limit
 
-    // Filters
     const categoryParam = searchParams.get('category');
     const category = categoryParam && ['TEXTBOOKS', 'ELECTRONICS', 'FURNITURE', 'HOUSING', 'SERVICES', 'TICKETS', 'OTHER'].includes(categoryParam)
       ? categoryParam as MarketplaceCategory
@@ -41,35 +40,27 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('isFree') === 'true'
     const search = searchParams.get('search')
     const sellerId = searchParams.get('sellerId')
-    const sortBy = searchParams.get('sortBy') || 'createdAt' // createdAt, price, title
+    const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    let where: any = {
+    let where: Record<string, unknown> = {
       status: 'ACTIVE',
     }
 
-    // Category filter
-    if (category) {
-      where.category = category
-    }
+    if (category) where.category = category
+    if (condition) where.condition = condition
 
-    // Condition filter
-    if (condition) {
-      where.condition = condition
-    }
-
-    // Price filters
     if (isFree) {
       where.isFree = true
     } else {
       if (minPrice !== undefined || maxPrice !== undefined) {
-        where.price = {}
-        if (minPrice !== undefined) where.price.gte = minPrice
-        if (maxPrice !== undefined) where.price.lte = maxPrice
+        const priceFilter: Record<string, number> = {}
+        if (minPrice !== undefined) priceFilter.gte = minPrice
+        if (maxPrice !== undefined) priceFilter.lte = maxPrice
+        where.price = priceFilter
       }
     }
 
-    // Search
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -77,13 +68,9 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    // Seller filter
-    if (sellerId) {
-      where.sellerId = sellerId
-    }
+    if (sellerId) where.sellerId = sellerId
 
-    // Sorting
-    let orderBy: any = { createdAt: 'desc' }
+    let orderBy: Record<string, string> = { createdAt: 'desc' }
     if (sortBy === 'price') {
       orderBy = { price: sortOrder }
     } else if (sortBy === 'title') {
@@ -105,19 +92,14 @@ export async function GET(request: NextRequest) {
           },
         },
         reviews: {
-          select: {
-            rating: true,
-          },
+          select: { rating: true },
         },
         _count: {
-          select: {
-            reviews: true,
-          },
+          select: { reviews: true },
         },
       },
     })
 
-    // Calculate average rating for each listing
     const listingsWithRating = listings.map(listing => ({
       ...listing,
       averageRating: listing.reviews.length > 0
@@ -143,6 +125,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json()
     const listingData = CreateListingSchema.parse(body)
@@ -151,7 +136,7 @@ export async function POST(request: NextRequest) {
       data: {
         title: listingData.title,
         description: listingData.description,
-        sellerId: listingData.sellerId,
+        sellerId: auth.userId,
         category: listingData.category,
         condition: listingData.condition,
         price: listingData.price,
@@ -183,4 +168,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to create listing' }, { status: 500 })
   }
 }
-

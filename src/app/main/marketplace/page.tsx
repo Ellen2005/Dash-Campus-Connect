@@ -201,12 +201,22 @@ export default function MarketplacePage() {
     }
   };
 
-  const buyNow = (listing: Listing) => {
+  const buyNow = async (listing: Listing) => {
     if (!dashUser) {
       toast({ title: "Sign in required", description: "Please sign in to purchase items." });
       return;
     }
-    router.push(`/main/marketplace/checkout?listingId=${listing.id}`);
+    if (listing.seller.id === dashUser.id) {
+      toast({ title: "Your own listing", description: "You can't buy your own item." });
+      return;
+    }
+    await ensureDbUser(dashUser, session);
+    await fetch("/api/cart/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ listingId: listing.id, quantity: 1 }),
+    }).catch(() => {});
+    router.push(`/main/marketplace/checkout`);
   };
 
   const categories = [

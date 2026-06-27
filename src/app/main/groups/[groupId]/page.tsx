@@ -121,7 +121,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ groupId:
       <div className="dash-card p-6 space-y-4">
         <div className="flex items-center gap-4">
           <Avatar className="w-16 h-16 rounded-xl">
-            <AvatarImage src={group.photo || ""} />
+            <AvatarImage src={group.photo ?? undefined} />
             <AvatarFallback className="rounded-xl bg-primary/15 text-primary text-xl font-bold">
               {(group.name || "G")[0].toUpperCase()}
             </AvatarFallback>

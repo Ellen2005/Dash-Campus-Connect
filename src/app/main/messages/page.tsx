@@ -20,6 +20,7 @@ interface Conversation {
   username?: string;
   otherUserId?: string;
   lastMessageAt?: string;
+  unreadCount?: number;
 }
 
 interface MessageItem {
@@ -279,16 +280,26 @@ export default function MessagesPage() {
                       active ? "border-primary/40 bg-primary/8" : "border-transparent hover:border-border hover:bg-muted/40"
                     }`}
                   >
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={conversation.photo} />
-                      <AvatarFallback>{conversation.name?.[0] ?? "U"}</AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={conversation.photo} />
+                        <AvatarFallback>{conversation.name?.[0] ?? "U"}</AvatarFallback>
+                      </Avatar>
+                      {conversation.unreadCount != null && conversation.unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-destructive border-2 border-card" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{conversation.name}</p>
                       <p className="truncate text-[11px] text-muted-foreground">
                         {conversation.lastMessageAt ? new Date(conversation.lastMessageAt).toLocaleString() : t("noConversationsYet")}
                       </p>
                     </div>
+                    {conversation.unreadCount != null && conversation.unreadCount > 0 && (
+                      <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center px-1">
+                        {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
+                      </span>
+                    )}
                   </button>
                 );
               })

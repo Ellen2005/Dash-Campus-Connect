@@ -144,25 +144,26 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const eventData = CreateEventSchema.parse(body)
+    const { organizerId, ...safeEventData } = CreateEventSchema.parse(body)
 
+    // Always use authenticated user as organizer (ignore client-provided organizerId)
     const event = await prisma.event.create({
       data: {
-        title: eventData.title,
-        description: eventData.description,
-        date: new Date(eventData.date),
-        endDate: eventData.endDate ? new Date(eventData.endDate) : null,
-        location: eventData.location,
-        latitude: eventData.latitude,
-        longitude: eventData.longitude,
-        capacity: eventData.capacity,
-        organizerId: eventData.organizerId,
-        groupId: eventData.groupId,
-        isFree: eventData.isFree,
-        ticketPrice: eventData.ticketPrice,
+        title: safeEventData.title,
+        description: safeEventData.description,
+        date: new Date(safeEventData.date),
+        endDate: safeEventData.endDate ? new Date(safeEventData.endDate) : null,
+        location: safeEventData.location,
+        latitude: safeEventData.latitude,
+        longitude: safeEventData.longitude,
+        capacity: safeEventData.capacity,
+        organizerId: user.userId,
+        groupId: safeEventData.groupId,
+        isFree: safeEventData.isFree,
+        ticketPrice: safeEventData.ticketPrice,
       approvalStatus: 'PENDING',
-        bannerImage: eventData.bannerImageUrl,
-        category: eventData.category,
+        bannerImage: safeEventData.bannerImageUrl,
+        category: safeEventData.category,
       },
       include: {
         organizer: {

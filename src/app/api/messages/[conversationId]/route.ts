@@ -1,50 +1,50 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUser } from '@/lib/require-user';
 
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { conversationId } = await params
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || auth.userId
+
+    if (userId !== auth.userId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId parameter required' }, { status: 400 })
-    }
-
     let messages
     let conversation
 
-    // Check if it's a direct conversation (format: direct-userId)
+    let totalMessages = 0
+
     if (conversationId.startsWith('direct-')) {
       const otherUserId = conversationId.replace('direct-', '')
 
-      // Verify the conversation exists (user has messaged this person)
-      const hasConversation = await prisma.message.findFirst({
+      totalMessages = await prisma.message.count({
         where: {
           OR: [
-            { senderId: userId, recipient: otherUserId },
-            { senderId: otherUserId, recipient: userId },
+            { senderId: userId, recipientId: otherUserId },
+            { senderId: otherUserId, recipientId: userId },
           ],
         },
       })
 
-      if (!hasConversation) {
-        return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
-      }
-
-      // Get messages
       messages = await prisma.message.findMany({
         where: {
           OR: [
-            { senderId: userId, recipient: otherUserId },
-            { senderId: otherUserId, recipient: userId },
+            { senderId: userId, recipientId: otherUserId },
+            { senderId: otherUserId, recipientId: userId },
           ],
         },
         skip,
@@ -62,7 +62,6 @@ export async function GET(
         },
       })
 
-      // Get conversation info
       const otherUser = await prisma.user.findUnique({
         where: { id: otherUserId },
         select: {
@@ -82,25 +81,17 @@ export async function GET(
         otherUserId,
       }
     } else {
-      // Group conversation
+      totalMessages = await prisma.message.count({
+        where: { chatGroupId: conversationId },
+      })
+
       const group = await prisma.chatGroup.findUnique({
         where: { id: conversationId },
-        include: {
-          messages: {
-            skip,
-            take: limit,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              sender: {
-                select: {
-                  id: true,
-                  name: true,
-                  profilePhoto: true,
-                  username: true,
-                },
-              },
-            },
-          },
+        select: {
+          id: true,
+          name: true,
+          photo: true,
+          members: true,
         },
       })
 
@@ -112,7 +103,23 @@ export async function GET(
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
       }
 
-      messages = group.messages
+      messages = await prisma.message.findMany({
+        where: { chatGroupId: conversationId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              profilePhoto: true,
+              username: true,
+            },
+          },
+        },
+      })
+
       conversation = {
         id: group.id,
         type: 'group',
@@ -122,16 +129,25 @@ export async function GET(
       }
     }
 
-    const total = messages.length // For simplicity, not calculating total for pagination
+    // Mark unread messages as read
+    const unreadIds = messages
+      .filter(m => m.senderId !== userId && !m.isRead)
+      .map(m => m.id);
+    if (unreadIds.length > 0) {
+      await prisma.message.updateMany({
+        where: { id: { in: unreadIds } },
+        data: { isRead: true, readAt: new Date() },
+      });
+    }
 
     return NextResponse.json({
       conversation,
-      messages: messages.reverse(), // Show oldest first
+      messages: messages.reverse(),
       pagination: {
         page,
         limit,
-        total,
-        pages: Math.ceil(total / limit),
+        total: totalMessages,
+        pages: Math.ceil(totalMessages / limit),
       },
     })
   } catch (error) {

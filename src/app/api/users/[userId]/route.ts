@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireUser } from '@/lib/require-user'
 
 
 const UpdateUserSchema = z.object({
@@ -14,6 +15,7 @@ const UpdateUserSchema = z.object({
   phone: z.string().optional(),
   secondaryEmail: z.string().email().optional(),
   hometown: z.string().optional(),
+  privacyPublic: z.boolean().optional(),
 })
 
 export async function GET(
@@ -23,7 +25,6 @@ export async function GET(
   try {
     const { userId } = await params
 
-    // Fetch user with explicit field selection to avoid column mismatch
     const userQuery = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -56,6 +57,7 @@ export async function GET(
           take: 10,
           orderBy: { createdAt: 'desc' },
         },
+        notificationPrefs: true,
         followers: true,
         following: true,
       },
@@ -76,8 +78,16 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { userId } = await params
+
+    if (userId !== auth.userId) {
+      return NextResponse.json({ error: 'You can only update your own profile' }, { status: 403 })
+    }
+
     const body = await request.json()
     const updateData = UpdateUserSchema.parse(body)
 
@@ -86,7 +96,6 @@ export async function PATCH(
       data: updateData,
     })
 
-    // Don't return password
     const { password, ...userWithoutPassword } = user
 
     return NextResponse.json(userWithoutPassword)

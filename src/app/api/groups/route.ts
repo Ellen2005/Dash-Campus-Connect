@@ -14,7 +14,6 @@ const CreateGroupSchema = z.object({
   department: z.string().optional(),
   year: z.string().optional(),
   courseCode: z.string().optional(),
-  creatorId: z.string(),
   isPublic: z.boolean().default(true),
 })
 
@@ -152,7 +151,7 @@ export async function POST(request: NextRequest) {
         department: groupData.department,
         year: groupData.year,
         courseCode: groupData.courseCode,
-        creatorId: groupData.creatorId,
+        creatorId: user.userId,
         isPublic: groupData.isPublic,
       },
       include: {
@@ -169,7 +168,7 @@ export async function POST(request: NextRequest) {
     // Auto-add creator as member with OWNER role
     await prisma.groupMember.create({
       data: {
-        userId: groupData.creatorId,
+        userId: user.userId,
         groupId: group.id,
         role: 'OWNER',
       },

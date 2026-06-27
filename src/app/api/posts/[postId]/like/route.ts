@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireUser } from '@/lib/require-user'
 
 
 const LikeSchema = z.object({
-  userId: z.string(),
   reaction: z.string().default('👍'),
 })
 
@@ -12,12 +12,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { postId } = await params
     const body = await request.json()
-    const { userId, reaction } = LikeSchema.parse(body)
+    const { reaction } = LikeSchema.parse(body)
 
-    // Check if post exists
     const post = await prisma.post.findUnique({
       where: { id: postId },
       select: { id: true },
@@ -27,22 +29,20 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    // Check if user already liked this post
     const existingLike = await prisma.like.findUnique({
       where: {
         userId_postId: {
-          userId,
+          userId: auth.userId,
           postId,
         },
       },
     })
 
     if (existingLike) {
-      // Unlike: remove the like
       await prisma.like.delete({
         where: {
           userId_postId: {
-            userId,
+            userId: auth.userId,
             postId,
           },
         },
@@ -54,10 +54,9 @@ export async function POST(
         message: 'Post unliked successfully',
       })
     } else {
-      // Like: create new like
       const like = await prisma.like.create({
         data: {
-          userId,
+          userId: auth.userId,
           postId,
           reaction,
         },
@@ -92,19 +91,16 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { postId } = await params
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId parameter required' }, { status: 400 })
-    }
 
     const like = await prisma.like.findUnique({
       where: {
         userId_postId: {
-          userId,
+          userId: auth.userId,
           postId,
         },
       },

@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireUser } from '@/lib/require-user'
 
 
 const CreateCommentSchema = z.object({
   content: z.string().min(1).max(1000),
-  authorId: z.string(),
   parentCommentId: z.string().optional(),
 })
 
@@ -23,7 +23,7 @@ export async function GET(
     const comments = await prisma.comment.findMany({
       where: {
         postId,
-        parentCommentId: null, // Only top-level comments
+        parentCommentId: null,
       },
       skip,
       take: limit,
@@ -84,12 +84,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { postId } = await params
     const body = await request.json()
-    const { content, authorId, parentCommentId } = CreateCommentSchema.parse(body)
+    const { content, parentCommentId } = CreateCommentSchema.parse(body)
 
-    // Check if post exists
     const post = await prisma.post.findUnique({
       where: { id: postId },
       select: { id: true },
@@ -99,7 +101,6 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 })
     }
 
-    // If replying to a comment, check if parent comment exists and belongs to this post
     if (parentCommentId) {
       const parentComment = await prisma.comment.findUnique({
         where: { id: parentCommentId },
@@ -114,7 +115,7 @@ export async function POST(
     const comment = await prisma.comment.create({
       data: {
         content,
-        authorId,
+        authorId: auth.userId,
         postId,
         parentCommentId,
       },

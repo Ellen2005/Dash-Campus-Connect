@@ -1,6 +1,7 @@
 /**
  * Simple in-memory rate limiter for API routes.
- * For production, replace with Redis-based rate limiting (e.g., @upstash/ratelimit).
+ * For production (multiple instances), replace with Redis-based rate limiting
+ * (e.g., @upstash/ratelimit or Vercel KV).
  */
 
 interface RateLimitRecord {
@@ -9,9 +10,10 @@ interface RateLimitRecord {
 }
 
 const store = new Map<string, RateLimitRecord>();
+const MAX_STORE_SIZE = 10000;
 
 // Clean up expired entries every 5 minutes
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, record] of store.entries()) {
     if (now > record.resetAt) {
@@ -19,6 +21,7 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+cleanupTimer.unref();
 
 /**
  * Check if a request should be rate limited.
@@ -37,6 +40,12 @@ export function rateLimit(
   const record = store.get(key);
 
   if (!record || now > record.resetAt) {
+    if (record) store.delete(key);
+    // Evict oldest entry if store is too large (safety limit)
+    if (store.size >= MAX_STORE_SIZE) {
+      const oldestKey = store.keys().next().value;
+      if (oldestKey) store.delete(oldestKey);
+    }
     store.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true };
   }

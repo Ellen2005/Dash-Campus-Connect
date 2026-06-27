@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ServerSidebar, ChannelSidebar } from "@/components/layout/discord-sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -39,6 +39,36 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const { user, dashUser, loading, signOut } = useAuth();
   const canAccessAdmin = dashUser?.role === "student_admin" || dashUser?.role === "admin";
   const isStudentAdmin = dashUser?.isStudentAdmin || dashUser?.role === "student_admin";
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+
+  const fetchUnreadCounts = useCallback(async () => {
+    try {
+      const [notifRes, msgRes] = await Promise.all([
+        fetch("/api/notifications/unread", { cache: "no-store" }),
+        fetch("/api/messages/unread", { cache: "no-store" }),
+      ]);
+      if (notifRes.ok) {
+        const notifJson = await notifRes.json();
+        setUnreadNotifCount(notifJson.count ?? 0);
+      }
+      if (msgRes.ok) {
+        const msgJson = await msgRes.json();
+        setUnreadMsgCount(msgJson.count ?? 0);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadCounts();
+    const interval = setInterval(fetchUnreadCounts, 30_000);
+    window.addEventListener("focus", fetchUnreadCounts);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", fetchUnreadCounts);
+    };
+  }, [user, fetchUnreadCounts]);
 
   const navItems = mobileNavItems(t);
 
@@ -111,22 +141,27 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <span className="font-headline font-bold text-base tracking-tight">Dash</span>
           </div>
           <div className="flex items-center gap-1">
-            <Link href="/main/search">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                <Search className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/main/notifications">
-              <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground">
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
-              </Button>
-            </Link>
-            <Link href="/main/messages">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                <MessageCircle className="w-4 h-4" />
-              </Button>
-            </Link>
+              <Link href="/main/search">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                  <Search className="w-4 h-4" />
+                </Button>
+              </Link>
+              <Link href="/main/notifications">
+                <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground">
+                  <Bell className="w-4 h-4" />
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
+                  )}
+                </Button>
+              </Link>
+              <Link href="/main/messages">
+                <Button variant="ghost" size="icon" className="h-8 w-8 relative text-muted-foreground">
+                  <MessageCircle className="w-4 h-4" />
+                  {unreadMsgCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
+                  )}
+                </Button>
+              </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -155,10 +190,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon className="w-5 h-5" />
-                {href === "/main/notifications" && (
-                  <span className="absolute top-2 right-[calc(50%-14px)] w-1.5 h-1.5 rounded-full bg-destructive" />
-                )}
+                <div className="relative">
+                  <Icon className="w-5 h-5" />
+                  {href === "/main" && unreadNotifCount > 0 && (
+                    <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-destructive" />
+                  )}
+                  {href === "/main/messages" && unreadMsgCount > 0 && (
+                    <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-destructive" />
+                  )}
+                </div>
                 <span className="text-[9px] font-semibold uppercase tracking-wider">{label}</span>
               </Link>
             );

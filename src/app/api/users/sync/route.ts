@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
 
 const SyncUserSchema = z.object({
   id: z.string().min(1),
@@ -17,57 +18,49 @@ const SyncUserSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Require authentication — this API creates/updates user records
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const data = SyncUserSchema.parse(body);
+
+    // Only allow syncing your own user record (security: prevent mass-create via sync)
+    if (data.id !== authUser.id) {
+      return NextResponse.json({ error: "You can only sync your own user record" }, { status: 403 });
+    }
 
     const email = data.email ?? `${data.username}@dash-campus.app`;
 
     let fieldOfStudyId: string | undefined = data.fieldOfStudyId;
     let levelId: string | undefined = data.levelId;
 
+    // Only auto-create fields/levels if explicitly provided (no silent creation)
     if (data.schoolId && data.faculty && !fieldOfStudyId) {
-      // Try to find existing field of study or create one
       const existingField = await prisma.fieldOfStudy.findFirst({
         where: {
           schoolId: data.schoolId,
           name: { contains: data.faculty, mode: 'insensitive' }
         }
       });
-
       if (existingField) {
         fieldOfStudyId = existingField.id;
-      } else {
-        const newField = await prisma.fieldOfStudy.create({
-          data: {
-            schoolId: data.schoolId,
-            name: data.faculty,
-          }
-        });
-        fieldOfStudyId = newField.id;
       }
     }
 
     if (data.schoolId && data.year && !levelId) {
-      // Try to find existing level or create one
       const existingLevel = await prisma.level.findFirst({
         where: {
           schoolId: data.schoolId,
           name: { contains: data.year, mode: 'insensitive' }
         }
       });
-
       if (existingLevel) {
         levelId = existingLevel.id;
-      } else {
-        const newLevel = await prisma.level.create({
-          data: {
-            schoolId: data.schoolId,
-            name: data.year,
-            order: parseInt(data.year.replace(/\D/g, '')) || 0,
-          }
-        });
-        levelId = newLevel.id;
       }
     }
 

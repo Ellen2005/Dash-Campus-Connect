@@ -60,7 +60,7 @@ export default function OnboardingPage() {
               <div className="flex flex-col items-center gap-5">
                 <div className="relative">
                   <Avatar className="w-28 h-28 border-4 border-primary/30 shadow-xl">
-                    <AvatarImage src={avatar || ""} />
+                    <AvatarImage src={avatar ?? undefined} />
                     <AvatarFallback className="bg-primary/15 text-primary text-3xl font-bold">{initials}</AvatarFallback>
                   </Avatar>
                   <label htmlFor="avatar-upload" className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full cursor-pointer hover:opacity-90 transition-opacity shadow-lg">

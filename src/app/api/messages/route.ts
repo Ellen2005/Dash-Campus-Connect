@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { requireUser } from '@/lib/require-user';
 
 
 
 const SendMessageSchema = z.object({
-  senderId: z.string(),
   recipient: z.string().optional(),
   chatGroupId: z.string().optional(),
   content: z.string().max(2000).optional(),
@@ -14,34 +14,35 @@ const SendMessageSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const userId = searchParams.get('userId') || auth.userId
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId parameter required' }, { status: 400 })
+    // Users can only view their own conversations
+    if (userId !== auth.userId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
     // Get all conversations for the user
-    // This includes both direct messages and group chats
     const [directMessages, groupChats] = await Promise.all([
-      // Get unique recipients from direct messages
       prisma.message.findMany({
         where: {
           OR: [
             { senderId: userId },
-            { recipient: userId },
+            { recipientId: userId },
           ],
-          chatGroupId: null, // Only direct messages
+          chatGroupId: null,
         },
         select: {
           senderId: true,
-          recipient: true,
+          recipientId: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
       }),
-      // Get group chats the user is in
       prisma.chatGroup.findMany({
         where: {
           members: {
@@ -66,11 +67,10 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
-    // Process direct message conversations
     const directConversations = new Map()
 
     directMessages.forEach(message => {
-      const otherUserId = message.senderId === userId ? message.recipient : message.senderId
+      const otherUserId = message.senderId === userId ? message.recipientId : message.senderId
       if (otherUserId && !directConversations.has(otherUserId)) {
         directConversations.set(otherUserId, {
           type: 'direct',
@@ -80,20 +80,58 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    const directUserIds = Array.from(directConversations.keys())
+
     // Get user details for direct conversations
-    const directConversationUsers = await prisma.user.findMany({
-      where: {
-        id: {
-          in: Array.from(directConversations.keys()),
+    const directConversationUsers = directUserIds.length > 0
+      ? await prisma.user.findMany({
+          where: {
+            id: {
+              in: directUserIds,
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            profilePhoto: true,
+            username: true,
+          },
+        })
+      : []
+
+    // Compute unread counts per conversation
+    const unreadDirectCounts = new Map<string, number>();
+    if (directUserIds.length > 0) {
+      const unreadDirectMessages = await prisma.message.groupBy({
+        by: ['senderId'],
+        where: {
+          recipientId: userId,
+          senderId: { in: directUserIds },
+          isRead: false,
         },
-      },
-      select: {
-        id: true,
-        name: true,
-        profilePhoto: true,
-        username: true,
-      },
-    })
+        _count: { id: true },
+      });
+      unreadDirectMessages.forEach(entry => {
+        unreadDirectCounts.set(entry.senderId, entry._count.id);
+      });
+    }
+
+    const groupIds = groupChats.map(g => g.id);
+    const unreadGroupCounts = new Map<string, number>();
+    if (groupIds.length > 0) {
+      const unreadGroupMessages = await prisma.message.groupBy({
+        by: ['chatGroupId'],
+        where: {
+          chatGroupId: { in: groupIds },
+          senderId: { not: userId },
+          isRead: false,
+        },
+        _count: { id: true },
+      });
+      unreadGroupMessages.forEach(entry => {
+        unreadGroupCounts.set(entry.chatGroupId!, entry._count.id);
+      });
+    }
 
     // Combine and format conversations
     const conversations = [
@@ -106,6 +144,7 @@ export async function GET(request: NextRequest) {
         username: user.username,
         otherUserId: user.id,
         lastMessageAt: directConversations.get(user.id)?.lastMessageAt,
+        unreadCount: unreadDirectCounts.get(user.id) ?? 0,
       })),
       // Group conversations
       ...groupChats.map(group => ({
@@ -116,6 +155,7 @@ export async function GET(request: NextRequest) {
         members: group.members,
         lastMessageAt: group.messages[0]?.createdAt,
         lastMessage: group.messages[0],
+        unreadCount: unreadGroupCounts.get(group.id) ?? 0,
       })),
     ]
 
@@ -134,12 +174,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   try {
     const body = await request.json()
-    const { senderId, recipient, chatGroupId, content, images, voiceUrl } = SendMessageSchema.parse(body)
+    const { recipient, chatGroupId, content, images, voiceUrl } = SendMessageSchema.parse(body)
     const trimmedContent = (content ?? '').trim()
 
-    // Validate that either recipient or chatGroupId is provided
     if (!recipient && !chatGroupId) {
       return NextResponse.json({ error: 'Either recipient or chatGroupId must be provided' }, { status: 400 })
     }
@@ -152,7 +194,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message must contain text, attachment, or audio.' }, { status: 400 })
     }
 
-    // For direct messages, check if recipient exists
     if (recipient) {
       const recipientUser = await prisma.user.findUnique({
         where: { id: recipient },
@@ -164,7 +205,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // For group messages, check if group exists and user is a member
     if (chatGroupId) {
       const group = await prisma.chatGroup.findUnique({
         where: { id: chatGroupId },
@@ -175,15 +215,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Chat group not found' }, { status: 404 })
       }
 
-      if (!group.members.includes(senderId)) {
+      if (!group.members.includes(auth.userId)) {
         return NextResponse.json({ error: 'User is not a member of this chat group' }, { status: 403 })
       }
     }
 
     const message = await prisma.message.create({
       data: {
-        senderId,
-        recipient,
+        senderId: auth.userId,
+        recipientId: recipient,
         chatGroupId,
         content: trimmedContent || '(attachment)',
         images,

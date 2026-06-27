@@ -52,6 +52,7 @@ export default function ProfilePage() {
   const [generatingBio, setGeneratingBio] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notifs, setNotifs] = useState(true);
+  const [privacyPublic, setPrivacyPublic] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
 
@@ -74,6 +75,7 @@ export default function ProfilePage() {
           setUserData(userJson);
           setBio(userJson.bio || "No bio yet.");
           setFaculty(userJson.fieldOfStudy?.name || dashUser?.faculty || "Unknown Field");
+          if (typeof userJson.privacyPublic === "boolean") setPrivacyPublic(userJson.privacyPublic);
         }
         if (Array.isArray(savedJson?.posts)) setSavedPosts(savedJson.posts);
         if (Array.isArray(postsJson?.posts)) setUserPosts(postsJson.posts);
@@ -381,7 +383,20 @@ export default function ProfilePage() {
                     <p className="text-sm font-medium">{t("publicProfile")}</p>
                     <p className="text-[11px] text-muted-foreground">{t("publicProfileDesc")}</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={privacyPublic}
+                    onCheckedChange={async (val) => {
+                      setPrivacyPublic(val);
+                      if (dashUser?.id) {
+                        await fetch(`/api/users/${dashUser.id}`, {
+                          method: "PATCH",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({ privacyPublic: val }),
+                        });
+                        toast({ title: t("saveChanges"), description: "Profile visibility updated." });
+                      }
+                    }}
+                  />
                 </div>
               </div>
               {/* Danger Zone */}

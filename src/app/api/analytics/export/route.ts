@@ -1,21 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-async function getSession() {
-  try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    return session;
-  } catch {
-    return null;
-  }
-}
+import { requireUser } from "@/lib/require-user";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+  if (auth.dbUser.role !== "admin" && auth.dbUser.role !== "student_admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

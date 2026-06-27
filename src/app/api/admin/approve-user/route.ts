@@ -42,19 +42,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "You can only approve users for your school." }, { status: 403 });
   }
 
+  // Update Prisma DB first — if this fails, the auth update is never attempted
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { approvalStatus: "APPROVED" },
+    });
+  } catch (e) {
+    console.error("[approve-user] DB update failed:", e);
+    return NextResponse.json({ error: "Database error. User not approved." }, { status: 500 });
+  }
+
+  // Then update auth metadata — this is authoritative for login checks
   const { error: updateErr } = await supabase.auth.admin.updateUserById(userId, {
     user_metadata: { ...currentMeta, status: "active" },
   });
-  if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  if (updateErr) {
+    // Rollback the DB update since auth update failed
+    await prisma.user.update({
+      where: { id: userId },
+      data: { approvalStatus: "PENDING" },
+    }).catch(() => {});
+    return NextResponse.json({ error: updateErr.message }, { status: 500 });
+  }
 
+  // Assign communities (best-effort, non-fatal)
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
-        data: { approvalStatus: "APPROVED" },
-      });
-    });
     await assignStudentToCommunities(userId);
+  } catch (e) {
+    console.error("[approve-user] Community assignment failed (non-fatal):", e);
+  }
+
+  // Send notification (best-effort)
+  try {
     await createNotification({
       userId,
       type: "SYSTEM_ALERT",
@@ -63,11 +83,7 @@ export async function POST(request: NextRequest) {
       actionUrl: "/main",
     });
   } catch (e) {
-    console.error("[approve-user] DB/community assignment failed:", e);
-    return NextResponse.json(
-      { error: "Account approved in auth, but community assignment failed. Contact support." },
-      { status: 500 }
-    );
+    console.error("[approve-user] Notification failed (non-fatal):", e);
   }
 
   return NextResponse.json({ success: true }, { status: 200 });

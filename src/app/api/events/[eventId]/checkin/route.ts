@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser } from "@/lib/require-user";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ eventId: string }> }) {
+  const auth = await requireUser();
+  if (auth.errorResponse) return auth.errorResponse;
+
   const { eventId } = await params;
   try {
     const body = await req.json();
@@ -9,6 +13,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
 
     if (!userId) {
       return NextResponse.json({ error: "userId required" }, { status: 400 });
+    }
+
+    // Only allow checking in yourself (or admin)
+    if (userId !== auth.userId && auth.dbUser.role !== "ADMIN" && auth.dbUser.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "You can only check in yourself" }, { status: 403 });
     }
 
     // Verify user is an attendee
@@ -29,7 +38,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ eve
       data: { checkedIn: true },
     });
 
-    // Log the check-in
     await prisma.activityLog.create({
       data: {
         userId,

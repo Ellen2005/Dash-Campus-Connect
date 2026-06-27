@@ -63,6 +63,7 @@ model User {
   following             Follow[]        @relation("following")
   groupMemberships      GroupMember[]
   messages              Message[]
+  receivedMessages      Message[]       @relation("DirectMessages")
   mentionedIn           Mention[]
   createdGroups         Group[]         @relation("groupCreator")
   communityMemberships  CommunityMember[] @relation("user")
@@ -79,6 +80,7 @@ model User {
   reportedFlags         ModeratorFlag[] @relation("ReportedFlags")
   ticketMessages        TicketMessage[] @relation("TicketMessages")
   uploadedResources     LibraryResource[]
+  activityLogs          ActivityLog[]
 
   @@unique([schoolId, studentId])
   @@index([email])
@@ -457,10 +459,13 @@ enum AnnouncementPriority {
 model AdminChatGroup {
   id              String              @id @default(cuid())
   name            String              @default("Admin Channel")
+  schoolId        String?
   messages        AdminChatMessage[]
   
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+
+  @@index([schoolId])
 }
 
 model AdminChatMessage {
@@ -665,7 +670,8 @@ model Message {
   senderId    String
   
   // For 1-on-1 chats
-  recipient   String?     // User ID
+  recipient   User?       @relation("DirectMessages", fields: [recipientId], references: [id], onDelete: SetNull)
+  recipientId String?
   
   // For group chats
   chatGroup   ChatGroup?  @relation(fields: [chatGroupId], references: [id], onDelete: Cascade)
@@ -681,6 +687,7 @@ model Message {
   updatedAt   DateTime    @updatedAt
 
   @@index([senderId])
+  @@index([recipientId])
   @@index([chatGroupId])
 }
 
@@ -989,6 +996,8 @@ model ActivityLog {
   action    String
   resource  String
   createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
